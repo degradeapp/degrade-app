@@ -8,3 +8,4 @@ Route::get('/', function () {
 
 require __DIR__.'/modules/auth.php';
 require __DIR__.'/modules/customer.php';
+require __DIR__.'/modules/barber.php';

@@ -1,0 +1,14 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "no_trailing_whitespace_in_comment": true,
+        "no_trailing_whitespace_in_string": true,
+        "single_line_comment_spacing": true
+    },
+    "exclude": [
+        "bootstrap",
+        "storage",
+        "vendor",
+        "node_modules"
+    ]
+}

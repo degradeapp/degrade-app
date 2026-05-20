@@ -1,8 +1,88 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Degradê — SaaS Gestão de Barbearias
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+Sistema modular de gestão de barbearias brasileiras, desenvolvido com Laravel 12, Vue 3 e PostgreSQL.
+
+## Setup Local
+
+### Requisitos
+- Docker + Docker Compose
+- Git
+
+### Início Rápido
+
+```bash
+# Clonar repositório
+git clone <repo> degrade
+cd degrade
+
+# Copiar .env
+cp .env.example .env
+
+# Instalar dependências
+composer install && npm install
+
+# Build frontend
+npm run build
+
+# Gerar chave
+php artisan key:generate
+
+# Migrar banco
+php artisan migrate
+
+# Servidor
+php artisan serve
+```
+
+### Docker
+
+```bash
+docker-compose up -d
+docker-compose logs -f app
+```
+
+## Desenvolvimento
+
+### Estrutura
+
+```
+app/Modules/           # Módulos por feature
+├── Tenant/            # Multi-tenancy
+├── Auth/              # Autenticação
+├── Customer/          # Clientes
+├── Barber/            # Barbeiros
+├── Service/           # Serviços
+├── Appointment/       # Agendamentos (coração)
+├── Commission/        # Comissões
+└── ... (10+ módulos)
+
+resources/js/          # Frontend Vue 3 + TypeScript
+tests/                 # Testes Pest
+```
+
+### Comandos
+
+```bash
+composer test           # Testes
+composer lint           # Format código
+npm run type-check     # Type check TS
+
+php artisan migrate    # Migrar
+php artisan db:seed    # Seed
+php artisan tinker     # REPL
+```
+
+## Stack
+
+- **Backend**: PHP 8.4 + Laravel 12 + PostgreSQL + Redis
+- **Frontend**: Vue 3 + TypeScript + Inertia.js + TailwindCSS
+- **Testing**: Pest
+- **Style**: Pint
+- **Deploy**: Coolify (Hostinger Brasil)
+
+## Roadmap
+
+Ver `memory/ROADMAP.md`
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>

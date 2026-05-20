@@ -5,8 +5,10 @@ namespace App\Modules\Tenant\Traits;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Scopes\TenantScope;
 
-trait BelongsToTenant {
-    protected static function bootBelongsToTenant(): void {
+trait BelongsToTenant
+{
+    protected static function bootBelongsToTenant(): void
+    {
         static::addGlobalScope(new TenantScope);
 
         static::creating(function ($model) {
@@ -24,7 +26,8 @@ trait BelongsToTenant {
         });
     }
 
-    public function tenant() {
+    public function tenant()
+    {
         return $this->belongsTo(Tenant::class);
     }
 }

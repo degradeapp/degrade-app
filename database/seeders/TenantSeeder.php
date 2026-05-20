@@ -5,8 +5,10 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-class TenantSeeder extends Seeder {
-    public function run(): void {
+class TenantSeeder extends Seeder
+{
+    public function run(): void
+    {
         DB::table('tenants')->insertOrIgnore([
             [
                 'id' => 1,

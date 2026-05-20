@@ -7,8 +7,9 @@ use App\Modules\Tenant\Traits\BelongsToTenant;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable {
-    use HasApiTokens, BelongsToTenant;
+class User extends Authenticatable
+{
+    use BelongsToTenant, HasApiTokens;
 
     protected $fillable = [
         'tenant_id',
@@ -30,23 +31,28 @@ class User extends Authenticatable {
         'is_active' => 'boolean',
     ];
 
-    public function tenant() {
+    public function tenant()
+    {
         return $this->belongsTo(Tenant::class);
     }
 
-    public function isOwner(): bool {
+    public function isOwner(): bool
+    {
         return $this->role === 'owner';
     }
 
-    public function isManager(): bool {
+    public function isManager(): bool
+    {
         return $this->role === 'manager';
     }
 
-    public function isReceptionist(): bool {
+    public function isReceptionist(): bool
+    {
         return $this->role === 'receptionist';
     }
 
-    public function isBarber(): bool {
+    public function isBarber(): bool
+    {
         return $this->role === 'barber';
     }
 }

@@ -6,8 +6,10 @@ use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
 use Tests\TestCase;
 
-class TenancyIsolationTest extends TestCase {
-    public function test_global_scope_applies_to_all_queries(): void {
+class TenancyIsolationTest extends TestCase
+{
+    public function test_global_scope_applies_to_all_queries(): void
+    {
         $tenant1 = Tenant::create([
             'name' => 'Tenant 1',
             'slug' => 'tenant-1',
@@ -44,7 +46,8 @@ class TenancyIsolationTest extends TestCase {
         $this->assertEquals($user1->id, $users->first()->id);
     }
 
-    public function test_creating_record_auto_sets_tenant_id(): void {
+    public function test_creating_record_auto_sets_tenant_id(): void
+    {
         $tenant = Tenant::create([
             'name' => 'Test Tenant',
             'slug' => 'test-tenant',
@@ -63,7 +66,8 @@ class TenancyIsolationTest extends TestCase {
         $this->assertEquals($tenant->id, $user->tenant_id);
     }
 
-    public function test_cannot_change_tenant_id_of_existing_record(): void {
+    public function test_cannot_change_tenant_id_of_existing_record(): void
+    {
         $tenant1 = Tenant::create([
             'name' => 'Tenant 1',
             'slug' => 'tenant-1',

@@ -11,7 +11,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->web(append: [
+            \App\Http\Middleware\EnsureTenantContext::class,
+            \App\Http\Middleware\EnsureActiveSubscription::class,
+            \App\Http\Middleware\EnsureOnboardingCompleted::class,
+        ]);
+
+        $middleware->alias([
+            'role' => \App\Http\Middleware\EnsureUserRole::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

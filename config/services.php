@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'asaas' => [
+        'api_key' => env('ASAAS_API_KEY'),
+        'sandbox' => env('ASAAS_SANDBOX', true),
+        'webhook_secret' => env('ASAAS_WEBHOOK_SECRET'),
+    ],
+
 ];

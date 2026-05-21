@@ -12,3 +12,4 @@ require __DIR__.'/modules/barber.php';
 require __DIR__.'/modules/service.php';
 require __DIR__.'/modules/appointment.php';
 require __DIR__.'/modules/commission.php';
+require __DIR__.'/modules/billing.php';

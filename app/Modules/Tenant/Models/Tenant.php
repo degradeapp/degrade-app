@@ -2,6 +2,8 @@
 
 namespace App\Modules\Tenant\Models;
 
+use App\Enums\BillingPlan;
+use App\Modules\Barber\Models\Barber;
 use App\Modules\User\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,6 +15,8 @@ class Tenant extends Model
         'status',
         'trial_ends_at',
         'asaas_customer_id',
+        'asaas_subscription_id',
+        'plan',
         'settings',
         'onboarding_completed_at',
     ];
@@ -64,5 +68,41 @@ class Tenant extends Model
         data_set($settings, $key, $value);
         $this->settings = $settings;
         $this->save();
+    }
+
+    public function currentPlan(): ?BillingPlan
+    {
+        return $this->plan ? BillingPlan::from($this->plan) : null;
+    }
+
+    public function barberLimit(): int
+    {
+        return $this->currentPlan()?->barberLimit() ?? 0;
+    }
+
+    public function canAddBarber(): bool
+    {
+        if (! $this->currentPlan()) {
+            return false;
+        }
+
+        $currentCount = $this->barbersCount();
+
+        return $currentCount < $this->barberLimit();
+    }
+
+    public function barbersCount(): int
+    {
+        return Barber::where('tenant_id', $this->id)->where('is_active', true)->count();
+    }
+
+    public function isSubscriptionActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    public function isTrialExpired(): bool
+    {
+        return $this->status === 'trial' && $this->trial_ends_at?->isPast();
     }
 }

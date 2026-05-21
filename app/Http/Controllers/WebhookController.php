@@ -14,13 +14,16 @@ class WebhookController extends Controller
 
     public function handleAsaasWebhook(Request $request): Response
     {
-        // Stub: Skip Asaas signature validation for now
-        // TODO: Implement signature validation with config('services.asaas.webhook_secret')
+        if (! $this->verifySignature($request)) {
+            Log::warning('Asaas webhook signature verification failed');
+
+            return response('Unauthorized', Response::HTTP_UNAUTHORIZED);
+        }
 
         $event = $request->input('event');
         $data = $request->input('data', []);
 
-        Log::info('Asaas webhook received (STUB)', [
+        Log::info('Asaas webhook received and verified', [
             'event' => $event,
             'customer_id' => $data['customer'] ?? null,
         ]);
@@ -34,6 +37,21 @@ class WebhookController extends Controller
         }
 
         return response('', Response::HTTP_OK);
+    }
+
+    private function verifySignature(Request $request): bool
+    {
+        $signature = $request->header('asaas-signature');
+        $secret = config('services.asaas.webhook_secret');
+
+        if (! $signature || ! $secret) {
+            return false;
+        }
+
+        $payload = $request->getContent();
+        $expectedSignature = hash_hmac('sha256', $payload, $secret);
+
+        return hash_equals($expectedSignature, $signature);
     }
 
     private function handlePaymentReceived(array $data): void

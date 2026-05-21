@@ -4,46 +4,105 @@ namespace App\Modules\Billing\Services;
 
 use App\Enums\BillingPlan;
 use App\Modules\Tenant\Models\Tenant;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class BillingService
 {
     private string $apiKey;
 
-    private bool $sandbox;
+    private string $baseUrl;
 
     public function __construct()
     {
         $this->apiKey = config('services.asaas.api_key', '');
-        $this->sandbox = config('services.asaas.sandbox', true);
+        $this->baseUrl = config('services.asaas.sandbox') ? 'https://sandbox.asaas.com/api/v3' : 'https://api.asaas.com/api/v3';
     }
 
     public function createCustomer(Tenant $tenant): string
     {
-        Log::info('BillingService: Creating Asaas customer (STUB)', [
-            'tenant_id' => $tenant->id,
-            'tenant_name' => $tenant->name,
-        ]);
+        try {
+            $owner = $tenant->users()->where('role', 'owner')->first();
 
-        // Stub: return fake customer ID
-        return 'cust_stub_'.uniqid();
+            $response = Http::withHeaders([
+                'accept' => 'application/json',
+            ])->asForm()->post($this->baseUrl.'/customers', [
+                'name' => $tenant->name,
+                'email' => $owner?->email ?? 'noemail@example.com',
+                'phone' => '11999999999', // Placeholder: should be from owner profile
+                'cpfCnpj' => '00000000000000', // Placeholder: should be from tenant settings
+            ])->withToken($this->apiKey)
+                ->throw()
+                ->json();
+
+            $customerId = $response['id'] ?? null;
+
+            if (! $customerId) {
+                throw new \Exception('Asaas: No customer ID returned');
+            }
+
+            Log::info('Asaas customer created', [
+                'tenant_id' => $tenant->id,
+                'customer_id' => $customerId,
+            ]);
+
+            return $customerId;
+        } catch (RequestException $e) {
+            Log::error('Asaas customer creation failed', [
+                'tenant_id' => $tenant->id,
+                'error' => $e->response->json(),
+            ]);
+
+            throw new \Exception('Erro ao criar cliente no Asaas: '.$e->getMessage());
+        }
     }
 
     public function createSubscription(Tenant $tenant, BillingPlan $plan): array
     {
-        Log::info('BillingService: Creating Asaas subscription (STUB)', [
-            'tenant_id' => $tenant->id,
-            'plan' => $plan->value,
-            'price' => $plan->price(),
-        ]);
+        try {
+            $customerId = $tenant->asaas_customer_id;
 
-        // Stub: return mock subscription data
-        return [
-            'id' => 'sub_stub_'.uniqid(),
-            'status' => 'ACTIVE',
-            'next_due_date' => now()->addMonth()->toDateString(),
-            'created_at' => now()->toIso8601String(),
-        ];
+            if (! $customerId) {
+                throw new \Exception('No customer ID found for tenant');
+            }
+
+            $response = Http::withHeaders([
+                'accept' => 'application/json',
+            ])->asForm()->post($this->baseUrl.'/subscriptions', [
+                'customerId' => $customerId,
+                'billingType' => 'UNDEFINED',
+                'value' => $plan->price(),
+                'nextDueDate' => now()->addMonth()->format('Y-m-d'),
+                'cycle' => 'MONTHLY',
+                'description' => 'Plano '.$plan->label(),
+            ])->withToken($this->apiKey)
+                ->throw()
+                ->json();
+
+            $subscriptionId = $response['id'] ?? null;
+            $status = $response['status'] ?? 'ACTIVE';
+            $nextDueDate = $response['nextDueDate'] ?? now()->addMonth()->toDateString();
+
+            Log::info('Asaas subscription created', [
+                'tenant_id' => $tenant->id,
+                'subscription_id' => $subscriptionId,
+                'plan' => $plan->value,
+            ]);
+
+            return [
+                'id' => $subscriptionId,
+                'status' => $status,
+                'next_due_date' => $nextDueDate,
+            ];
+        } catch (RequestException $e) {
+            Log::error('Asaas subscription creation failed', [
+                'tenant_id' => $tenant->id,
+                'error' => $e->response->json(),
+            ]);
+
+            throw new \Exception('Erro ao criar assinatura no Asaas: '.$e->getMessage());
+        }
     }
 
     public function updateSubscriptionStatus(Tenant $tenant, string $status): void
@@ -54,7 +113,7 @@ class BillingService
             'status' => $mappedStatus,
         ]);
 
-        Log::info('BillingService: Updated subscription status', [
+        Log::info('Subscription status updated', [
             'tenant_id' => $tenant->id,
             'asaas_status' => $status,
             'tenant_status' => $mappedStatus,
@@ -63,10 +122,29 @@ class BillingService
 
     public function cancelSubscription(Tenant $tenant): void
     {
-        Log::info('BillingService: Cancelling Asaas subscription (STUB)', [
-            'tenant_id' => $tenant->id,
-            'subscription_id' => $tenant->asaas_subscription_id,
-        ]);
+        try {
+            if (! $tenant->asaas_subscription_id) {
+                throw new \Exception('No subscription ID found for tenant');
+            }
+
+            Http::withToken($this->apiKey)
+                ->delete($this->baseUrl.'/subscriptions/'.$tenant->asaas_subscription_id)
+                ->throw();
+
+            $tenant->update(['status' => 'cancelled']);
+
+            Log::info('Asaas subscription cancelled', [
+                'tenant_id' => $tenant->id,
+                'subscription_id' => $tenant->asaas_subscription_id,
+            ]);
+        } catch (RequestException $e) {
+            Log::error('Asaas subscription cancellation failed', [
+                'tenant_id' => $tenant->id,
+                'error' => $e->response?->json(),
+            ]);
+
+            throw new \Exception('Erro ao cancelar assinatura no Asaas');
+        }
     }
 
     private function mapAsaasStatusToTenantStatus(string $asaasStatus): string

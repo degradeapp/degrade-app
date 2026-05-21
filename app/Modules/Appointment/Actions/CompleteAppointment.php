@@ -3,6 +3,7 @@
 namespace App\Modules\Appointment\Actions;
 
 use App\Enums\AppointmentStatus;
+use App\Events\AppointmentCompleted;
 use App\Modules\Appointment\Models\Appointment;
 
 readonly class CompleteAppointment
@@ -13,6 +14,8 @@ readonly class CompleteAppointment
             'status' => AppointmentStatus::completed,
             'completed_at' => now(),
         ]);
+
+        AppointmentCompleted::dispatch($appointment);
 
         return $appointment;
     }

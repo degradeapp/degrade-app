@@ -1,11 +1,11 @@
 FROM php:8.4-fpm
 
 RUN apt-get update && apt-get install -y \
-    git curl libpq-dev libzip-dev zip unzip \
+    git curl libpq-dev libzip-dev libsqlite3-dev zip unzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install \
-    pdo pdo_pgsql zip pcntl
+    pdo pdo_pgsql pdo_sqlite zip pcntl
 
 RUN pecl install redis && docker-php-ext-enable redis
 

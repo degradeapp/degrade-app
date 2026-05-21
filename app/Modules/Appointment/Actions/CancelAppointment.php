@@ -3,6 +3,7 @@
 namespace App\Modules\Appointment\Actions;
 
 use App\Enums\AppointmentStatus;
+use App\Events\AppointmentCancelled;
 use App\Modules\Appointment\Models\Appointment;
 
 readonly class CancelAppointment
@@ -12,6 +13,8 @@ readonly class CancelAppointment
         $appointment->update([
             'status' => AppointmentStatus::cancelled,
         ]);
+
+        AppointmentCancelled::dispatch($appointment);
 
         return $appointment;
     }

@@ -4,6 +4,7 @@ namespace App\Modules\Appointment\Actions;
 
 use App\Enums\AppointmentSource;
 use App\Enums\AppointmentStatus;
+use App\Events\AppointmentCreated;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Appointment\Services\AppointmentPricer;
 use App\Modules\Appointment\Services\AvailabilityService;
@@ -12,6 +13,7 @@ use App\Modules\Barber\Models\Barber;
 use App\Modules\Service\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 readonly class CreateAppointment
 {
@@ -68,7 +70,11 @@ readonly class CreateAppointment
 
             $this->pricer->snapshotServices($appointment, $services, $barberIds);
 
-            return $appointment->load('services');
+            $appointment->load('services');
+
+            Event::dispatch(new AppointmentCreated($appointment));
+
+            return $appointment;
         });
     }
 }

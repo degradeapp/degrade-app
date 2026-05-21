@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('appointment_id')->constrained()->cascadeOnDelete();
             $table->foreignId('service_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('barber_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('barber_id')->nullable()->constrained()->cascadeOnDelete();
             $table->decimal('price_snapshot', 10, 2)->comment('Snapshot do preço no momento da criação');
             $table->decimal('commission_percentage_snapshot', 5, 2)->comment('Snapshot da comissão');
             $table->timestamps();

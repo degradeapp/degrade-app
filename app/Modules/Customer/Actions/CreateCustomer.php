@@ -16,8 +16,6 @@ readonly class CreateCustomer
             'phone' => $phone,
             'email' => $email,
             'is_active' => true,
-            'total_visits' => 0,
-            'total_spent' => 0,
         ]);
     }
 }

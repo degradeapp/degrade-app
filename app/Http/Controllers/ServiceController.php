@@ -9,8 +9,8 @@ use App\Http\Resources\ServiceResource;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Service\Actions\AttachBarberService;
 use App\Modules\Service\Actions\CreateService;
-use App\Modules\Service\Actions\DeleteBarberService;
 use App\Modules\Service\Actions\DeleteService;
+use App\Modules\Service\Actions\DetachBarberService;
 use App\Modules\Service\Actions\UpdateService;
 use App\Modules\Service\Models\Service;
 use Illuminate\Http\JsonResponse;
@@ -95,7 +95,7 @@ class ServiceController extends Controller
         ]);
     }
 
-    public function detachBarber(Service $service, Barber $barber, DeleteBarberService $action): Response
+    public function detachBarber(Service $service, Barber $barber, DetachBarberService $action): Response
     {
         $this->authorize('update', $service);
 

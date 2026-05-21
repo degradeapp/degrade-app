@@ -7,10 +7,11 @@ use App\Modules\Barber\Models\Barber;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Commission extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, SoftDeletes;
 
     protected $fillable = [
         'tenant_id',
@@ -22,12 +23,17 @@ class Commission extends Model
         'reference_date',
         'paid_at',
         'notes',
+        'deleted_by',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'reference_date' => 'date',
         'paid_at' => 'datetime',
+    ];
+
+    protected $dates = [
+        'deleted_at',
     ];
 
     public function tenant()

@@ -32,6 +32,11 @@ class Tenant extends Model
         return $this->hasMany(User::class);
     }
 
+    public function barbers()
+    {
+        return $this->hasMany(Barber::class);
+    }
+
     public function isTrialing(): bool
     {
         return $this->status === 'trial' && $this->trial_ends_at?->isFuture();
@@ -93,7 +98,7 @@ class Tenant extends Model
 
     public function barbersCount(): int
     {
-        return Barber::where('tenant_id', $this->id)->where('is_active', true)->count();
+        return $this->barbers()->where('is_active', true)->count();
     }
 
     public function isSubscriptionActive(): bool

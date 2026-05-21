@@ -17,6 +17,7 @@ class Customer extends Model
         'phone',
         'email',
         'is_active',
+        'deleted_by',
     ];
 
     protected $casts = [

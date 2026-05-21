@@ -26,6 +26,7 @@ class Appointment extends Model
         'total_price',
         'notes',
         'completed_at',
+        'deleted_by',
     ];
 
     protected $casts = [

@@ -2,6 +2,8 @@
 
 namespace App\Modules\Barber\Models;
 
+use App\Modules\Appointment\Models\Appointment;
+use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Traits\BelongsToTenant;
 use App\Modules\User\Models\User;
@@ -19,6 +21,7 @@ class Barber extends Model
         'phone',
         'default_commission_percentage',
         'is_active',
+        'deleted_by',
     ];
 
     protected $casts = [
@@ -48,5 +51,17 @@ class Barber extends Model
     public function timeOffs()
     {
         return $this->hasMany(BarberTimeOff::class);
+    }
+
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
+    public function services()
+    {
+        return $this->belongsToMany(Service::class, 'barber_service')
+            ->withPivot('commission_percentage')
+            ->withTimestamps();
     }
 }

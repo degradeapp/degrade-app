@@ -20,6 +20,7 @@ class Service extends Model
         'price',
         'commission_percentage',
         'is_active',
+        'deleted_by',
     ];
 
     protected $casts = [

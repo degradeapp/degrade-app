@@ -4,13 +4,17 @@ namespace App\Modules\Appointment\Models;
 
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Service\Models\Service;
+use App\Modules\Tenant\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 
 class AppointmentService extends Model
 {
+    use BelongsToTenant;
+
     protected $table = 'appointment_services';
 
     protected $fillable = [
+        'tenant_id',
         'appointment_id',
         'service_id',
         'barber_id',

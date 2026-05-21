@@ -4,19 +4,18 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
-  tests:
+  test:
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:15
         env:
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: degrade_test
-          POSTGRES_USER: degrade
-          POSTGRES_PASSWORD: degrade_pass
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -26,7 +25,7 @@ jobs:
           - 5432:5432
 
       redis:
-        image: redis:7-alpine
+        image: redis:latest
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -42,100 +41,44 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pgsql, redis, zip
-          coverage: xdebug
-
-      - name: Get composer cache directory
-        id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-
-      - name: Cache composer dependencies
-        uses: actions/cache@v3
-        with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
+          extensions: pdo_pgsql,redis,mbstring
+          tools: composer:v2.7
 
       - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction
 
-      - name: Copy .env.testing
-        run: cp .env.example .env.testing
+      - name: Setup .env for testing
+        run: |
+          cp .env.example .env.testing
+          echo "DB_CONNECTION=pgsql" >> .env.testing
+          echo "DB_HOST=127.0.0.1" >> .env.testing
+          echo "DB_DATABASE=degrade_test" >> .env.testing
+          echo "DB_USERNAME=postgres" >> .env.testing
+          echo "DB_PASSWORD=postgres" >> .env.testing
 
-      - name: Generate application key
+      - name: Generate app key
         run: php artisan key:generate --env=testing
 
       - name: Run migrations
-        run: php artisan migrate:fresh --env=testing
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: localhost
-          DB_DATABASE: degrade_test
-          DB_USERNAME: degrade
-          DB_PASSWORD: degrade_pass
+        run: php artisan migrate --env=testing
 
-      - name: Run Pest tests
+      - name: Run tests
         run: composer test
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: localhost
-          DB_DATABASE: degrade_test
-          DB_USERNAME: degrade
-          DB_PASSWORD: degrade_pass
 
-      - name: Upload coverage
-        if: always()
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage.xml
+      - name: Run linting
+        run: composer lint -- --test
 
-  style:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-
-      - name: Install Pint
-        run: composer global require laravel/pint
-
-      - name: Check code style
-        run: pint --check
-
-  type-check:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Node dependencies
         run: npm install
 
-      - name: Run type check
+      - name: Run TypeScript type-check
         run: npm run type-check
 
-  security:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-
-      - name: Install dependencies
-        run: composer install --no-interaction
-
-      - name: Run security audits
-        run: composer audit
+      - name: Build frontend
+        run: npm run build

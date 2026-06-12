@@ -10,11 +10,13 @@ readonly class CreateBarberTimeOff
     public function __invoke(
         Barber $barber,
         string $date,
+        ?string $endDate = null,
         ?string $reason = null,
     ): BarberTimeOff {
         return BarberTimeOff::create([
             'barber_id' => $barber->id,
             'date' => $date,
+            'end_date' => $endDate,
             'reason' => $reason,
         ]);
     }

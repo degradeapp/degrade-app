@@ -19,6 +19,8 @@ return new class extends Migration
             $table->date('reference_date');
             $table->timestamp('paid_at')->nullable();
             $table->text('notes')->nullable();
+            $table->softDeletesDatetime('deleted_at');
+            $table->unsignedBigInteger('deleted_by')->nullable();
             $table->timestamps();
             $table->index(['tenant_id', 'barber_id', 'status', 'reference_date']);
             $table->index(['tenant_id', 'reference_date']);

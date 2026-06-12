@@ -6,6 +6,9 @@ use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
 
+// Note: Search tests require PostgreSQL with pg_trgm extension
+// Skip these tests when running with SQLite
+
 test('search finds customers by name', function () {
     $tenant = Tenant::factory()->create();
     $owner = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'owner']);

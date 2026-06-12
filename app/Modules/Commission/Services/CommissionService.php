@@ -12,11 +12,21 @@ class CommissionService
 {
     public function generateForAppointment(Appointment $appointment): Collection
     {
+        // Precisamos do usuário do barbeiro pra saber se é o próprio dono atendendo.
+        $appointment->loadMissing('services.barber.user');
+
         return DB::transaction(function () use ($appointment) {
             $commissions = [];
 
             foreach ($appointment->services as $appointmentService) {
                 if ($appointmentService->barber_id === null) {
+                    continue;
+                }
+
+                // O DONO não recebe "comissão": ele fica com a própria receita (que
+                // já aparece no Relatório por faturamento). Comissão é só o que a
+                // barbearia paga a um funcionário — você não se paga.
+                if (optional(optional($appointmentService->barber)->user)->isOwner()) {
                     continue;
                 }
 

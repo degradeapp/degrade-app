@@ -8,7 +8,7 @@ readonly class CreateCustomer
 {
     public function __invoke(
         string $name,
-        string $phone,
+        ?string $phone = null,
         ?string $email = null,
     ): Customer {
         return Customer::create([

@@ -2,21 +2,20 @@
 
 namespace App\Providers;
 
-use App\Events\AppointmentCancelled;
-use App\Events\AppointmentCompleted;
-use App\Events\AppointmentRescheduled;
-use App\Listeners\GenerateCommission;
-use App\Listeners\InvalidateAvailabilityCache;
-use App\Listeners\SendNotification;
-use App\Listeners\UpdateCustomerStats;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Commission\Models\Commission;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
+use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Services\TenantContext;
+use App\Modules\Tenant\Services\UnitContext;
 use App\Observers\AuditObserver;
-use Illuminate\Support\Facades\Event;
+use App\Policies\BillingPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,21 +23,17 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class, fn () => new TenantContext);
+        $this->app->singleton(UnitContext::class, fn () => new UnitContext);
     }
 
     public function boot(): void
     {
-        // Event listeners
-        Event::listen(AppointmentCompleted::class, GenerateCommission::class);
-        Event::listen(AppointmentCompleted::class, UpdateCustomerStats::class);
-        Event::listen(AppointmentCompleted::class, SendNotification::class);
-        Event::listen(AppointmentCompleted::class, InvalidateAvailabilityCache::class);
+        // Event listeners auto-discovered (handle(EventClass $event) in App\Listeners)
 
-        Event::listen(AppointmentCancelled::class, SendNotification::class);
-        Event::listen(AppointmentCancelled::class, InvalidateAvailabilityCache::class);
+        $this->configureRateLimiting();
 
-        Event::listen(AppointmentRescheduled::class, SendNotification::class);
-        Event::listen(AppointmentRescheduled::class, InvalidateAvailabilityCache::class);
+        // Tenant policy (model fora de App\Models — registro explícito)
+        Gate::policy(Tenant::class, BillingPolicy::class);
 
         // Model observers for auditing
         Customer::observe(AuditObserver::class);
@@ -46,5 +41,29 @@ class AppServiceProvider extends ServiceProvider
         Service::observe(AuditObserver::class);
         Appointment::observe(AuditObserver::class);
         Commission::observe(AuditObserver::class);
+    }
+
+    /**
+     * Rate limiters. 'auth' protege contra brute-force/credential-stuffing
+     * (login, registro, reset de senha); 'api' limita abuso por usuário/tenant.
+     */
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('auth', function (Request $request) {
+            $email = mb_strtolower(trim((string) $request->input('email')));
+
+            return [
+                // alvo específico (email+ip): trava ataque direcionado a uma conta
+                Limit::perMinute(5)->by($email.'|'.$request->ip()),
+                // por IP: trava varredura de muitos emails da mesma origem
+                Limit::perMinute(20)->by($request->ip()),
+            ];
+        });
+
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(120)->by(
+                $request->user()?->id ? 'user:'.$request->user()->id : 'ip:'.$request->ip()
+            );
+        });
     }
 }

@@ -11,6 +11,7 @@ class BarberTimeOffResource extends JsonResource
     {
         return [
             'date' => $this->date->format('Y-m-d'),
+            'end_date' => $this->end_date?->format('Y-m-d'),
             'reason' => $this->reason,
         ];
     }

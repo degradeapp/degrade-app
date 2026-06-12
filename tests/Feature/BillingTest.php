@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BillingPlan;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BillingTest extends TestCase
@@ -16,6 +17,13 @@ class BillingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Não bate na API real do Asaas durante os testes.
+        Http::fake([
+            '*/customers' => Http::response(['id' => 'cust_test_'.uniqid()], 200),
+            '*/subscriptions' => Http::response(['id' => 'sub_test_'.uniqid(), 'status' => 'PENDING'], 200),
+            '*' => Http::response([], 200),
+        ]);
 
         $this->tenant = Tenant::create([
             'name' => 'Test Barbershop',
@@ -43,14 +51,14 @@ class BillingTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->getJson('/billing');
+        $response = $this->getJson('/api/billing');
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'data' => [
                 'current_plan',
                 'current_price',
-                'barber_limit',
+                'staff_limit',
                 'status',
                 'trial_ends_at',
                 'available_plans',
@@ -62,13 +70,33 @@ class BillingTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->postJson('/billing/select-plan', [
+        $response = $this->postJson('/api/billing/select-plan', [
             'plan' => 'solo',
         ]);
 
         $response->assertStatus(201);
         $response->assertJsonPath('data.current_plan', 'solo');
-        $response->assertJsonPath('data.status', 'active');
+        // SEGURANÇA: selecionar plano NÃO ativa — só o webhook de pagamento ativa
+        $response->assertJsonPath('data.status', 'trial');
+    }
+
+    public function test_select_plan_does_not_activate_until_payment_webhook(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/billing/select-plan', ['plan' => 'solo'])->assertStatus(201);
+
+        $tenant = Tenant::find($this->tenant->id);
+        $this->assertEquals('trial', $tenant->status, 'plano selecionado não pode ativar sem pagamento');
+        $this->assertNotNull($tenant->asaas_subscription_id);
+
+        // Só o webhook de pagamento confirma a assinatura
+        $this->postJson('/api/webhooks/asaas', [
+            'event' => 'subscription.payment_received',
+            'data' => ['customer' => $tenant->asaas_customer_id],
+        ])->assertStatus(200);
+
+        $this->assertEquals('active', Tenant::find($this->tenant->id)->status);
     }
 
     public function test_select_plan_creates_customer_and_subscription(): void
@@ -77,7 +105,7 @@ class BillingTest extends TestCase
 
         $this->assertNull($this->tenant->asaas_customer_id);
 
-        $response = $this->postJson('/billing/select-plan', [
+        $response = $this->postJson('/api/billing/select-plan', [
             'plan' => 'barbearia',
         ]);
 
@@ -87,14 +115,15 @@ class BillingTest extends TestCase
         $this->assertNotNull($tenant->asaas_customer_id);
         $this->assertNotNull($tenant->asaas_subscription_id);
         $this->assertEquals('barbearia', $tenant->plan);
-        $this->assertEquals('active', $tenant->status);
+        // SEGURANÇA: continua em trial até o webhook de pagamento confirmar
+        $this->assertEquals('trial', $tenant->status);
     }
 
     public function test_select_plan_invalid_plan(): void
     {
         $this->actingAs($this->owner);
 
-        $response = $this->postJson('/billing/select-plan', [
+        $response = $this->postJson('/api/billing/select-plan', [
             'plan' => 'invalid',
         ]);
 
@@ -113,7 +142,7 @@ class BillingTest extends TestCase
 
         $this->actingAs($manager);
 
-        $response = $this->postJson('/billing/select-plan', [
+        $response = $this->postJson('/api/billing/select-plan', [
             'plan' => 'solo',
         ]);
 
@@ -152,33 +181,34 @@ class BillingTest extends TestCase
     {
         $solo = BillingPlan::solo;
         $this->assertEquals(59.00, $solo->price());
-        $this->assertEquals(1, $solo->barberLimit());
+        $this->assertEquals(1, $solo->staffLimit());
         $this->assertEquals('Solo', $solo->label());
 
         $barbearia = BillingPlan::barbearia;
         $this->assertEquals(119.00, $barbearia->price());
-        $this->assertEquals(4, $barbearia->barberLimit());
+        $this->assertEquals(4, $barbearia->staffLimit());
 
         $rede = BillingPlan::rede;
         $this->assertEquals(219.00, $rede->price());
-        $this->assertEquals(10, $rede->barberLimit());
+        $this->assertEquals(10, $rede->staffLimit());
     }
 
-    public function test_tenant_barber_limit(): void
+    public function test_tenant_staff_limit(): void
     {
         $this->tenant->update(['plan' => 'solo']);
-        $this->assertEquals(1, $this->tenant->barberLimit());
+        $this->assertEquals(1, $this->tenant->staffLimit());
 
         $this->tenant->update(['plan' => 'barbearia']);
-        $this->assertEquals(4, $this->tenant->barberLimit());
+        $this->assertEquals(4, $this->tenant->staffLimit());
 
         $this->tenant->update(['plan' => 'rede']);
-        $this->assertEquals(10, $this->tenant->barberLimit());
+        $this->assertEquals(10, $this->tenant->staffLimit());
     }
 
     public function test_tenant_can_add_barber_within_limit(): void
     {
-        $this->tenant->update(['plan' => 'solo', 'status' => 'active']);
+        // Barbearia (4) com apenas o dono cadastrado → ainda há vaga.
+        $this->tenant->update(['plan' => 'barbearia', 'status' => 'active']);
         $this->assertTrue($this->tenant->canAddBarber());
     }
 
@@ -216,6 +246,47 @@ class BillingTest extends TestCase
 
         $tenant = Tenant::find($this->tenant->id);
         $this->assertEquals('past_due', $tenant->status);
+    }
+
+    public function test_owner_can_cancel_subscription(): void
+    {
+        $this->tenant->update([
+            'status' => 'active',
+            'plan' => 'solo',
+            'asaas_subscription_id' => 'sub_123',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->postJson('/api/billing/cancel')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'cancelled');
+
+        $this->assertEquals('cancelled', Tenant::find($this->tenant->id)->status);
+    }
+
+    public function test_cancel_without_subscription_fails(): void
+    {
+        // Em trial, sem assinatura criada, não há o que cancelar.
+        $this->actingAs($this->owner)
+            ->postJson('/api/billing/cancel')
+            ->assertStatus(422);
+    }
+
+    public function test_manager_cannot_cancel_subscription(): void
+    {
+        $this->tenant->update(['asaas_subscription_id' => 'sub_123']);
+
+        $manager = User::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Manager',
+            'email' => 'manager2@test.local',
+            'password' => 'password',
+            'role' => 'manager',
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson('/api/billing/cancel')
+            ->assertStatus(403);
     }
 
     public function test_webhook_subscription_cancelled(): void

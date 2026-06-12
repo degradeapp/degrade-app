@@ -18,8 +18,10 @@ trait BelongsToTenant
         });
 
         static::updating(function ($model) {
-            if (config('app.env') !== 'testing') {
-                if ($model->isDirty('tenant_id') && $model->getOriginal('tenant_id') !== app('tenant')->id) {
+            // tenant_id é imutável após criado (independente de ambiente).
+            if ($model->isDirty('tenant_id')) {
+                $original = $model->getOriginal('tenant_id');
+                if ($original !== null && (int) $original !== (int) $model->getAttribute('tenant_id')) {
                     throw new \Exception('Cannot change tenant_id of existing record');
                 }
             }

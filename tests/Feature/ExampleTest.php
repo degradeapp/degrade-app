@@ -12,7 +12,8 @@ class ExampleTest extends TestCase
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        $response = $this->get('/');
+        // "/" exige autenticação; a página pública de login responde 200.
+        $response = $this->get('/login');
 
         $response->assertStatus(200);
     }

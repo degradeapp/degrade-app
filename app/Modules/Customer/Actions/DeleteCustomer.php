@@ -8,9 +8,9 @@ readonly class DeleteCustomer
 {
     public function __invoke(Customer $customer, int $userId): bool
     {
-        return (bool) $customer->update([
-            'deleted_by' => $userId,
-            'deleted_at' => now(),
-        ]);
+        $customer->deleted_by = $userId;
+        $customer->saveQuietly();
+
+        return (bool) $customer->delete();
     }
 }

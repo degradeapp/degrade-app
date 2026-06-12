@@ -5,18 +5,24 @@ namespace App\Modules\Service\Models;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Traits\BelongsToTenant;
+use Database\Factories\ServiceFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Service extends Model
 {
-    use BelongsToTenant, SoftDeletes;
+    use BelongsToTenant, HasFactory, SoftDeletes;
+
+    protected static function newFactory(): ServiceFactory
+    {
+        return ServiceFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
         'name',
         'description',
-        'duration_minutes',
         'price',
         'commission_percentage',
         'is_active',
@@ -24,7 +30,6 @@ class Service extends Model
     ];
 
     protected $casts = [
-        'duration_minutes' => 'int',
         'price' => 'decimal:2',
         'commission_percentage' => 'decimal:2',
         'is_active' => 'boolean',

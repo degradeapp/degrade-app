@@ -2,165 +2,124 @@
 
 namespace Tests\Feature;
 
+use App\Modules\Barber\Models\Barber;
+use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
-    public function test_register_creates_tenant_and_owner_in_transaction(): void
+    /** Payload do novo cadastro: DONO (pessoa) + telefone. Barbearia vem no onboarding. */
+    private function registerPayload(array $overrides = []): array
     {
-        $response = $this->postJson('/auth/register', [
-            'name' => 'John Owner',
+        return array_merge([
+            'name' => 'João Dono',
             'email' => 'owner@example.com',
+            'phone' => '92991234567',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop',
-            'tenant_slug' => 'test-barbershop',
-        ]);
+        ], $overrides);
+    }
+
+    public function test_register_creates_tenant_and_owner_in_transaction(): void
+    {
+        $response = $this->postJson('/api/auth/register', $this->registerPayload());
 
         $response->assertStatus(201)
             ->assertJsonStructure([
-                'id',
-                'name',
-                'email',
-                'role',
-                'role_label',
-                'is_active',
-                'tenant' => [
-                    'id',
-                    'name',
-                    'slug',
-                    'status',
-                    'trial_ends_at',
-                ],
+                'id', 'name', 'email', 'role', 'role_label', 'is_active',
+                'tenant' => ['id', 'name', 'slug', 'status', 'trial_ends_at'],
             ]);
 
+        // Tenant criado com nome placeholder (definido de verdade no onboarding)
         $this->assertDatabaseHas('tenants', [
-            'name' => 'Test Barbershop',
-            'slug' => 'test-barbershop',
+            'name' => 'Minha Barbearia',
             'status' => 'trial',
         ]);
 
+        // O nome informado é o do DONO, não da barbearia
         $this->assertDatabaseHas('users', [
             'email' => 'owner@example.com',
+            'name' => 'João Dono',
             'role' => 'owner',
             'is_active' => true,
         ]);
 
         $user = User::where('email', 'owner@example.com')->first();
         $this->assertNotNull($user->tenant);
-        $this->assertEquals('Test Barbershop', $user->tenant->name);
+        $this->assertSame('João Dono', $user->name);
+    }
+
+    public function test_register_creates_owner_barber_profile(): void
+    {
+        // O dono já entra como barbeiro da equipe (atende clientes): o card dele
+        // precisa existir desde o cadastro, sem precisar "adicionar a si mesmo".
+        $this->postJson('/api/auth/register', $this->registerPayload())->assertStatus(201);
+
+        $user = User::where('email', 'owner@example.com')->first();
+        $barber = Barber::where('user_id', $user->id)->first();
+
+        $this->assertNotNull($barber, 'o dono deve ter um perfil de barbeiro');
+        $this->assertSame('João Dono', $barber->name);
+        $this->assertSame('92991234567', $barber->phone);
+        $this->assertTrue((bool) $barber->is_active);
+        // Dono fica com 100% do próprio serviço por padrão.
+        $this->assertEquals(100.0, (float) $barber->default_commission_percentage);
     }
 
     public function test_register_trial_period_is_14_days(): void
     {
         $beforeRegister = now();
-        $this->postJson('/auth/register', [
-            'name' => 'John Owner',
-            'email' => 'owner@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop',
-            'tenant_slug' => 'test-barbershop',
-        ]);
+        $this->postJson('/api/auth/register', $this->registerPayload());
 
         $user = User::where('email', 'owner@example.com')->first();
         $trialEndsAt = $user->tenant->trial_ends_at;
 
         $this->assertNotNull($trialEndsAt);
-        $this->assertTrue($trialEndsAt->diffInDays($beforeRegister) === 14);
+        $this->assertEquals(14, abs((int) round($trialEndsAt->diffInDays($beforeRegister))));
     }
 
     public function test_register_fails_with_duplicate_email(): void
     {
-        $this->postJson('/auth/register', [
-            'name' => 'John Owner',
-            'email' => 'duplicate@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop 1',
-            'tenant_slug' => 'test-barbershop-1',
-        ]);
+        $this->postJson('/api/auth/register', $this->registerPayload(['email' => 'dup@example.com']));
 
-        $response = $this->postJson('/auth/register', [
-            'name' => 'Jane Owner',
-            'email' => 'duplicate@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop 2',
-            'tenant_slug' => 'test-barbershop-2',
-        ]);
+        $response = $this->postJson('/api/auth/register', $this->registerPayload([
+            'email' => 'dup@example.com',
+            'name' => 'Outro Dono',
+            'phone' => '92988887777',
+        ]));
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+        $response->assertStatus(422)->assertJsonValidationErrors(['email']);
     }
 
-    public function test_register_fails_with_duplicate_slug(): void
+    public function test_register_rejects_incomplete_phone(): void
     {
-        $this->postJson('/auth/register', [
-            'name' => 'John Owner',
-            'email' => 'john@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop 1',
-            'tenant_slug' => 'duplicate-slug',
-        ]);
+        $response = $this->postJson('/api/auth/register', $this->registerPayload(['phone' => '(92) 992']));
 
-        $response = $this->postJson('/auth/register', [
-            'name' => 'Jane Owner',
-            'email' => 'jane@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop 2',
-            'tenant_slug' => 'duplicate-slug',
-        ]);
-
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['tenant_slug']);
+        $response->assertStatus(422)->assertJsonValidationErrors(['phone']);
     }
 
-    public function test_register_fails_with_invalid_slug_format(): void
+    public function test_two_registrations_get_unique_slugs(): void
     {
-        $response = $this->postJson('/auth/register', [
-            'name' => 'John Owner',
-            'email' => 'john@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop',
-            'tenant_slug' => 'Invalid_Slug With Spaces',
-        ]);
+        $this->postJson('/api/auth/register', $this->registerPayload(['email' => 'a@example.com']))->assertStatus(201);
+        $this->postJson('/api/auth/register', $this->registerPayload(['email' => 'b@example.com', 'phone' => '92988887777']))->assertStatus(201);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['tenant_slug']);
+        // Mesmo nome de barbearia não existe no cadastro — slugs são aleatórios e únicos
+        $this->assertSame(2, Tenant::query()->distinct()->count('slug'));
     }
 
     public function test_login_returns_user_and_token(): void
     {
-        $this->postJson('/auth/register', [
-            'name' => 'John Owner',
-            'email' => 'owner@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop',
-            'tenant_slug' => 'test-barbershop',
-        ]);
+        $this->postJson('/api/auth/register', $this->registerPayload());
 
-        $response = $this->postJson('/auth/login', [
+        $response = $this->postJson('/api/auth/login', [
             'email' => 'owner@example.com',
             'password' => 'password123',
         ]);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'user' => [
-                    'id',
-                    'name',
-                    'email',
-                    'role',
-                    'role_label',
-                    'is_active',
-                    'tenant',
-                ],
+                'user' => ['id', 'name', 'email', 'role', 'role_label', 'is_active', 'tenant'],
                 'token',
             ]);
 
@@ -169,61 +128,42 @@ class AuthTest extends TestCase
 
     public function test_login_fails_with_invalid_credentials(): void
     {
-        $this->postJson('/auth/register', [
-            'name' => 'John Owner',
-            'email' => 'owner@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop',
-            'tenant_slug' => 'test-barbershop',
-        ]);
+        $this->postJson('/api/auth/register', $this->registerPayload());
 
-        $response = $this->postJson('/auth/login', [
+        $response = $this->postJson('/api/auth/login', [
             'email' => 'owner@example.com',
             'password' => 'wrongpassword',
         ]);
 
-        $response->assertStatus(401)
-            ->assertJsonPath('message', 'Credenciais inválidas.');
+        $response->assertStatus(401)->assertJsonPath('message', 'Credenciais inválidas.');
     }
 
     public function test_login_fails_with_nonexistent_email(): void
     {
-        $response = $this->postJson('/auth/login', [
+        $response = $this->postJson('/api/auth/login', [
             'email' => 'nonexistent@example.com',
             'password' => 'password123',
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
+        // Resposta genérica 401 — não revela se o email existe.
+        $response->assertStatus(401)->assertJsonPath('message', 'Credenciais inválidas.');
     }
 
     public function test_logout_invalidates_token(): void
     {
-        $registerResponse = $this->postJson('/auth/register', [
-            'name' => 'John Owner',
+        $this->postJson('/api/auth/register', $this->registerPayload());
+
+        $token = $this->postJson('/api/auth/login', [
             'email' => 'owner@example.com',
             'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'tenant_name' => 'Test Barbershop',
-            'tenant_slug' => 'test-barbershop',
-        ]);
+        ])->json('token');
 
-        $loginResponse = $this->postJson('/auth/login', [
-            'email' => 'owner@example.com',
-            'password' => 'password123',
-        ]);
+        $this->assertDatabaseCount('personal_access_tokens', 1);
 
-        $token = $loginResponse->json('token');
-
-        $response = $this->withToken($token)->postJson('/auth/logout');
-
-        $response->assertStatus(200)
+        $this->withToken($token)->postJson('/api/auth/logout')
+            ->assertStatus(200)
             ->assertJsonPath('message', 'Logout realizado com sucesso.');
 
-        $invalidTokenResponse = $this->withToken($token)->getJson('/auth/logout');
-        $this->assertTrue(
-            $invalidTokenResponse->status() === 401 || $invalidTokenResponse->status() === 403
-        );
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 }

@@ -1,7 +1,121 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-* {
-  font-variant-numeric: tabular-nums;
+@import "tailwindcss";
+
+@theme {
+  /* Tipografia */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* Cores — Backgrounds */
+  --color-bg-base: #0A0A0A;
+  --color-bg-surface: #131313;
+  --color-bg-elevated: #1A1A1A;
+  --color-bg-input: #161616;
+
+  /* Cores — Borders */
+  --color-border-subtle: #1F1F1F;
+  --color-border-default: #2A2A2A;
+  --color-border-strong: #3D3D3D;
+
+  /* Cores — Texto */
+  --color-text-primary: #F5F5F5;
+  --color-text-secondary: #A1A1A1;
+  --color-text-tertiary: #6B6B6B;
+
+  /* Cores — Accent (amarelo vivo Degradê) */
+  --color-accent: #FFD60A;
+  --color-accent-hover: #FFE066;
+  --color-accent-pressed: #F5C400;
+  --color-accent-muted: #FFD60A14;
+  --color-accent-glow: #FFD60A33;
+
+  /* Cores — Semânticas */
+  --color-danger: #EF4444;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-info: #3B82F6;
+}
+
+@layer base {
+  html, body {
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Remove as setinhas (spinner) de incremento/decremento dos inputs numéricos */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  /* Mobile-first: esconde a barra de rolagem no sistema todo (o scroll continua funcionando) */
+  * {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE / Edge legado */
+  }
+  *::-webkit-scrollbar {
+    display: none;                /* Chrome / Safari / Edge */
+    width: 0;
+    height: 0;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Movimento — linguagem de animação reutilizável do sistema.
+   .animate-enter: entrada suave (fade + slide-up) de uma tela/seção.
+   .stagger: faz os filhos diretos entrarem em cascata (listas, grids).
+   Curva "ease-out expressivo" (cubic-bezier) = sensação premium, nunca lenta.
+   ────────────────────────────────────────────────────────────────────── */
+@keyframes degrade-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-enter {
+  animation: degrade-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.stagger > * {
+  animation: degrade-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.11s; }
+.stagger > *:nth-child(3) { animation-delay: 0.17s; }
+.stagger > *:nth-child(4) { animation-delay: 0.23s; }
+.stagger > *:nth-child(5) { animation-delay: 0.29s; }
+.stagger > *:nth-child(6) { animation-delay: 0.35s; }
+.stagger > *:nth-child(7) { animation-delay: 0.41s; }
+.stagger > *:nth-child(8) { animation-delay: 0.47s; }
+.stagger > *:nth-child(n + 9) { animation-delay: 0.53s; }
+
+/* Bottom sheets: deslizam de baixo pra cima ao abrir. */
+@keyframes degrade-sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-sheet {
+  animation: degrade-sheet-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Acessibilidade: respeita quem pediu menos animação no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter,
+  .animate-sheet,
+  .stagger > * {
+    animation: none !important;
+  }
 }

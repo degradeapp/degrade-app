@@ -3,6 +3,9 @@
 use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/search', [SearchController::class, 'index']);
+Route::prefix('api')->name('api.')->group(function () {
+    Route::middleware('auth:sanctum', 'throttle:api')->group(function () {
+        Route::get('/search', [SearchController::class, 'index'])->name('search');
+        Route::post('/search', [SearchController::class, 'index']);
+    });
 });

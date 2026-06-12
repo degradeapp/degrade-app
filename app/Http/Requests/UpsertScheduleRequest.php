@@ -18,4 +18,13 @@ class UpsertScheduleRequest extends FormRequest
             'end_time' => 'required|date_format:H:i|after:start_time',
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'start_time.date_format' => 'Horário de início inválido.',
+            'end_time.date_format' => 'Horário de fim inválido.',
+            'end_time.after' => 'O horário de fim deve ser depois do início.',
+        ];
+    }
 }

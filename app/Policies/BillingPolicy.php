@@ -16,4 +16,10 @@ class BillingPolicy extends BasePolicy
     {
         return $user->role->value === 'owner' && $user->tenant->isTrialing();
     }
+
+    public function cancelPlan(User $user, Tenant $tenant): bool
+    {
+        // Só o dono cancela, e só a própria barbearia.
+        return $user->role->value === 'owner' && $user->tenant_id === $tenant->id;
+    }
 }

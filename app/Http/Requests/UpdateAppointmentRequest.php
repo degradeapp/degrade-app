@@ -19,7 +19,15 @@ class UpdateAppointmentRequest extends FormRequest
             'barber_ids' => 'nullable|array',
             'barber_ids.*' => 'nullable|exists:barbers,id',
             'starts_at' => 'nullable|date_format:Y-m-d\TH:i:s|after:now',
-            'notes' => 'nullable|string|max:1000',
+            'notes' => 'nullable|string|max:100',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'starts_at.after' => 'O horário precisa ser no futuro.',
+            'starts_at.date_format' => 'Horário inválido.',
         ];
     }
 }

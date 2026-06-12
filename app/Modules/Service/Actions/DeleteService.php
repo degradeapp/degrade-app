@@ -8,9 +8,9 @@ readonly class DeleteService
 {
     public function __invoke(Service $service, int $userId): bool
     {
-        return (bool) $service->update([
-            'deleted_by' => $userId,
-            'deleted_at' => now(),
-        ]);
+        $service->deleted_by = $userId;
+        $service->saveQuietly();
+
+        return (bool) $service->delete();
     }
 }

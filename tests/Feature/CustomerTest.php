@@ -58,7 +58,7 @@ class CustomerTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->postJson('/customers', [
+        $response = $this->postJson('/api/customers', [
             'name' => 'João Silva',
             'phone' => '92991234567',
             'email' => 'joao@example.com',
@@ -88,7 +88,7 @@ class CustomerTest extends TestCase
     {
         $this->actingAs($this->manager);
 
-        $response = $this->postJson('/customers', [
+        $response = $this->postJson('/api/customers', [
             'name' => 'Maria Santos',
             'phone' => '92988776655',
         ]);
@@ -100,28 +100,29 @@ class CustomerTest extends TestCase
         ]);
     }
 
-    public function test_receptionist_cannot_create_customer(): void
+    public function test_receptionist_can_create_customer(): void
     {
+        // Recepcionista é front-desk: precisa cadastrar walk-in para agendar.
         $this->actingAs($this->receptionist);
 
-        $response = $this->postJson('/customers', [
+        $response = $this->postJson('/api/customers', [
             'name' => 'Test Customer',
             'phone' => '92987654321',
         ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(201);
     }
 
     public function test_create_customer_fails_with_duplicate_phone(): void
     {
         $this->actingAs($this->owner);
 
-        $this->postJson('/customers', [
+        $this->postJson('/api/customers', [
             'name' => 'First Customer',
             'phone' => '92991234567',
         ]);
 
-        $response = $this->postJson('/customers', [
+        $response = $this->postJson('/api/customers', [
             'name' => 'Second Customer',
             'phone' => '92991234567',
         ]);
@@ -134,7 +135,7 @@ class CustomerTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $this->postJson('/customers', [
+        $this->postJson('/api/customers', [
             'name' => 'First Customer',
             'phone' => '92991234567',
         ]);
@@ -156,7 +157,7 @@ class CustomerTest extends TestCase
         app()->instance('tenant', $otherTenant);
         $this->actingAs($otherOwner);
 
-        $response = $this->postJson('/customers', [
+        $response = $this->postJson('/api/customers', [
             'name' => 'Other Customer',
             'phone' => '92991234567',
         ]);
@@ -182,9 +183,11 @@ class CustomerTest extends TestCase
             'is_active' => true,
         ]);
 
-        $customer2->update(['deleted_at' => now(), 'deleted_by' => $this->owner->id]);
+        $customer2->deleted_by = $this->owner->id;
+        $customer2->saveQuietly();
+        $customer2->delete();
 
-        $response = $this->getJson('/customers');
+        $response = $this->getJson('/api/customers');
 
         $response->assertStatus(200);
         $ids = $response->json('data.*.id');
@@ -202,7 +205,7 @@ class CustomerTest extends TestCase
             'phone' => '92991234567',
         ]);
 
-        $response = $this->putJson("/customers/{$customer->id}", [
+        $response = $this->putJson("/api/customers/{$customer->id}", [
             'name' => 'Updated Name',
             'phone' => '92999999999',
             'email' => 'updated@example.com',
@@ -226,7 +229,7 @@ class CustomerTest extends TestCase
             'phone' => '92991234567',
         ]);
 
-        $response = $this->deleteJson("/customers/{$customer->id}");
+        $response = $this->deleteJson("/api/customers/{$customer->id}");
 
         $response->assertStatus(204);
 
@@ -248,9 +251,9 @@ class CustomerTest extends TestCase
             'phone' => '92991234567',
         ]);
 
-        $this->deleteJson("/customers/{$customer->id}");
+        $this->deleteJson("/api/customers/{$customer->id}");
 
-        $response = $this->getJson('/customers');
+        $response = $this->getJson('/api/customers');
         $ids = $response->json('data.*.id');
 
         $this->assertNotContains($customer->id, $ids);
@@ -260,7 +263,7 @@ class CustomerTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->postJson('/customers', [
+        $response = $this->postJson('/api/customers', [
             'name' => 'Test Customer',
             'phone' => '92991234567',
         ]);
@@ -299,8 +302,85 @@ class CustomerTest extends TestCase
         app()->instance('tenant', $otherTenant);
         $this->actingAs($otherOwner);
 
-        $response = $this->getJson("/customers/{$customer->id}");
+        $response = $this->getJson("/api/customers/{$customer->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
+    }
+
+    public function test_create_customer_rejects_incomplete_phone(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/customers', ['name' => 'Fulano', 'phone' => '(92) 992'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+    }
+
+    public function test_create_customer_rejects_phone_without_ddd(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/customers', ['name' => 'Fulano', 'phone' => '99999-1111'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+    }
+
+    public function test_create_customer_rejects_10_digit_landline(): void
+    {
+        $this->actingAs($this->owner);
+
+        // 10 dígitos (DDD + 8) — só aceitamos celular de 11 dígitos
+        $this->postJson('/api/customers', ['name' => 'Fulano', 'phone' => '(92) 3333-4444'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+    }
+
+    public function test_create_customer_without_phone_succeeds(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/customers', ['name' => 'Sem Telefone'])
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('customers', [
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Sem Telefone',
+            'phone' => null,
+        ]);
+    }
+
+    public function test_multiple_customers_without_phone_are_allowed(): void
+    {
+        $this->actingAs($this->owner);
+
+        // Telefone nulo não dispara o índice único (vários clientes sem número são OK)
+        $this->postJson('/api/customers', ['name' => 'Cliente A'])->assertStatus(201);
+        $this->postJson('/api/customers', ['name' => 'Cliente B'])->assertStatus(201);
+    }
+
+    public function test_create_customer_normalizes_formatted_phone_to_digits(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/customers', ['name' => 'Carlos', 'phone' => '(92) 99999-1111'])
+            ->assertStatus(201);
+
+        // Armazenado só com dígitos → uniqueness e busca ficam consistentes
+        $this->assertDatabaseHas('customers', [
+            'tenant_id' => $this->tenant->id,
+            'phone' => '92999991111',
+        ]);
+    }
+
+    public function test_formatted_and_raw_phone_count_as_duplicate(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/customers', ['name' => 'A', 'phone' => '92999991111'])->assertStatus(201);
+
+        // Mesmo número, formatado diferente → deve bloquear como duplicado
+        $this->postJson('/api/customers', ['name' => 'B', 'phone' => '(92) 99999-1111'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
     }
 }

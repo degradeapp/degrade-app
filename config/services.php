@@ -41,4 +41,10 @@ return [
         'webhook_secret' => env('ASAAS_WEBHOOK_SECRET'),
     ],
 
+    'whatsapp' => [
+        'api_url' => env('WHATSAPP_API_URL', 'https://graph.facebook.com/v18.0'),
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+    ],
+
 ];

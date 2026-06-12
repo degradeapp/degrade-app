@@ -15,7 +15,16 @@ class CreateTimeOffRequest extends FormRequest
     {
         return [
             'date' => 'required|date|after_or_equal:today',
+            'end_date' => 'nullable|date|after_or_equal:date',
             'reason' => 'nullable|string|max:255',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'date.after_or_equal' => 'A data de início não pode ser no passado.',
+            'end_date.after_or_equal' => 'A data de fim deve ser igual ou posterior à de início.',
         ];
     }
 }

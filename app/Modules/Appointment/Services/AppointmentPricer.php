@@ -9,15 +9,22 @@ use Illuminate\Database\Eloquent\Collection;
 
 class AppointmentPricer
 {
-    public function calculateTotal(Collection $services): float
+    /**
+     * @param  array<int,float>  $priceOverrides  preço por serviço (id => valor); vazio = preço de catálogo
+     */
+    public function calculateTotal(Collection $services, array $priceOverrides = []): float
     {
-        return $services->sum(fn ($service) => $service->price);
+        return $services->sum(fn ($service) => $priceOverrides[$service->id] ?? $service->price);
     }
 
+    /**
+     * @param  array<int,float>  $priceOverrides  preço por serviço (id => valor) só para este atendimento
+     */
     public function snapshotServices(
         Appointment $appointment,
         Collection $services,
-        array $barberIds = []
+        array $barberIds = [],
+        array $priceOverrides = []
     ): void {
         foreach ($services as $index => $service) {
             $barberId = $barberIds[$index] ?? null;
@@ -27,7 +34,7 @@ class AppointmentPricer
             $appointment->services()->create([
                 'service_id' => $service->id,
                 'barber_id' => $barberId,
-                'price_snapshot' => $service->price,
+                'price_snapshot' => $priceOverrides[$service->id] ?? $service->price,
                 'commission_percentage_snapshot' => $commissionPercentage,
             ]);
         }
@@ -49,13 +56,14 @@ class AppointmentPricer
             return (float) $service->commission_percentage;
         }
 
-        if ($barberId) {
-            $barber = Barber::find($barberId);
-            if ($barber) {
-                return (float) $barber->default_commission_percentage;
-            }
+        if ($barberId && isset($barber) && $barber) {
+            return (float) $barber->default_commission_percentage;
         }
 
-        return null;
+        $tenant = app('tenant');
+        $settings = is_string($tenant->settings ?? null) ? json_decode($tenant->settings, true) : ($tenant->settings ?? []);
+        $tenantDefault = data_get($settings, 'financial.default_commission_percentage');
+
+        return $tenantDefault !== null ? (float) $tenantDefault : null;
     }
 }

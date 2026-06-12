@@ -7,6 +7,7 @@ use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 readonly class SearchService
 {
@@ -14,6 +15,8 @@ readonly class SearchService
 
     public function search(int $tenantId, string $query, int $page = 1): array
     {
+        $query = trim($query);
+
         if (mb_strlen($query) < 2) {
             return [
                 'results' => [],
@@ -24,27 +27,20 @@ readonly class SearchService
             ];
         }
 
-        $cacheKey = "search:{$tenantId}:".hash('sha256', $query).":page:{$page}";
+        $cacheKey = "search:{$tenantId}:".hash('sha256', mb_strtolower($query)).":page:{$page}";
         $cached = Cache::get($cacheKey);
         if ($cached) {
             return $cached;
         }
 
-        $query = trim($query);
-        $searchTerm = "%{$query}%";
-
-        $customers = $this->searchCustomers($tenantId, $searchTerm);
-        $barbers = $this->searchBarbers($tenantId, $searchTerm);
-        $services = $this->searchServices($tenantId, $searchTerm);
-
         $allResults = collect()
-            ->merge($customers)
-            ->merge($barbers)
-            ->merge($services)
+            ->merge($this->searchCustomers($tenantId, $query))
+            ->merge($this->searchBarbers($tenantId, $query))
+            ->merge($this->searchServices($tenantId, $query))
             ->sortByDesc('relevance')
             ->values();
 
-        $total = count($allResults);
+        $total = $allResults->count();
         $paginated = $allResults
             ->slice(($page - 1) * $this->resultsPerPage, $this->resultsPerPage)
             ->values();
@@ -62,87 +58,99 @@ readonly class SearchService
         return $result;
     }
 
-    private function searchCustomers(int $tenantId, string $searchTerm): Collection
+    private function normalize(string $value): string
+    {
+        return mb_strtolower(Str::ascii($value));
+    }
+
+    private function digitsOnly(?string $value): string
+    {
+        return preg_replace('/\D/', '', (string) $value) ?? '';
+    }
+
+    private function matchesName(string $name, string $query): bool
+    {
+        return str_contains($this->normalize($name), $this->normalize($query));
+    }
+
+    private function matchesPhone(?string $phone, string $query): bool
+    {
+        $digits = $this->digitsOnly($query);
+
+        return $digits !== '' && str_contains($this->digitsOnly($phone), $digits);
+    }
+
+    private function searchCustomers(int $tenantId, string $query): Collection
     {
         return Customer::where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
-            ->where(function ($q) use ($searchTerm) {
-                $q->whereRaw('name ILIKE ?', [$searchTerm])
-                    ->orWhereRaw('phone ILIKE ?', [$searchTerm]);
-            })
             ->get()
-            ->map(function (Customer $customer) use ($searchTerm) {
-                return [
-                    'id' => $customer->id,
-                    'type' => 'customer',
-                    'name' => $customer->name,
-                    'phone' => $customer->phone,
-                    'metadata' => [
-                        'total_visits' => $customer->total_visits,
-                        'total_spent' => $customer->total_spent,
-                        'last_visit_at' => $customer->last_visit_at?->toIso8601String(),
-                    ],
-                    'relevance' => $this->calculateRelevance($customer->name, $searchTerm),
-                ];
-            });
+            ->filter(fn (Customer $c) => $this->matchesName($c->name, $query) || $this->matchesPhone($c->phone, $query))
+            ->map(fn (Customer $customer) => [
+                'id' => $customer->id,
+                'type' => 'customer',
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'metadata' => [
+                    'total_visits' => $customer->total_visits,
+                    'total_spent' => $customer->total_spent,
+                    'last_visit_at' => $customer->last_visit_at?->toIso8601String(),
+                ],
+                'relevance' => $this->calculateRelevance($customer->name, $query),
+            ])
+            ->values();
     }
 
-    private function searchBarbers(int $tenantId, string $searchTerm): Collection
+    private function searchBarbers(int $tenantId, string $query): Collection
     {
         return Barber::where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
-            ->where(function ($q) use ($searchTerm) {
-                $q->whereRaw('name ILIKE ?', [$searchTerm])
-                    ->orWhereRaw('phone ILIKE ?', [$searchTerm]);
-            })
             ->get()
-            ->map(function (Barber $barber) use ($searchTerm) {
-                return [
-                    'id' => $barber->id,
-                    'type' => 'barber',
-                    'name' => $barber->name,
-                    'phone' => $barber->phone,
-                    'metadata' => [
-                        'is_active' => $barber->is_active,
-                        'commission' => $barber->default_commission_percentage,
-                    ],
-                    'relevance' => $this->calculateRelevance($barber->name, $searchTerm),
-                ];
-            });
+            ->filter(fn (Barber $b) => $this->matchesName($b->name, $query) || $this->matchesPhone($b->phone, $query))
+            ->map(fn (Barber $barber) => [
+                'id' => $barber->id,
+                'type' => 'barber',
+                'name' => $barber->name,
+                'phone' => $barber->phone,
+                'metadata' => [
+                    'is_active' => $barber->is_active,
+                    'commission' => $barber->default_commission_percentage,
+                ],
+                'relevance' => $this->calculateRelevance($barber->name, $query),
+            ])
+            ->values();
     }
 
-    private function searchServices(int $tenantId, string $searchTerm): Collection
+    private function searchServices(int $tenantId, string $query): Collection
     {
         return Service::where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
-            ->whereRaw('name ILIKE ?', [$searchTerm])
             ->get()
-            ->map(function (Service $service) use ($searchTerm) {
-                return [
-                    'id' => $service->id,
-                    'type' => 'service',
-                    'name' => $service->name,
-                    'phone' => null,
-                    'metadata' => [
-                        'duration_minutes' => $service->duration_minutes,
-                        'price' => $service->price,
-                        'is_active' => $service->is_active,
-                    ],
-                    'relevance' => $this->calculateRelevance($service->name, $searchTerm),
-                ];
-            });
+            ->filter(fn (Service $s) => $this->matchesName($s->name, $query))
+            ->map(fn (Service $service) => [
+                'id' => $service->id,
+                'type' => 'service',
+                'name' => $service->name,
+                'phone' => null,
+                'metadata' => [
+                    'price' => $service->price,
+                    'is_active' => $service->is_active,
+                ],
+                'relevance' => $this->calculateRelevance($service->name, $query),
+            ])
+            ->values();
     }
 
-    private function calculateRelevance(string $field, string $searchTerm): float
+    private function calculateRelevance(string $field, string $query): float
     {
-        $fieldLower = mb_strtolower($field);
-        $termLower = trim(mb_strtolower($searchTerm), '%');
+        $fieldNorm = $this->normalize($field);
+        $termNorm = $this->normalize(trim($query, '%'));
 
-        if ($fieldLower === $termLower) {
+        if ($fieldNorm === $termNorm) {
             return 3.0; // exact match
         }
 
-        if (str_starts_with($fieldLower, $termLower)) {
+        if (str_starts_with($fieldNorm, $termNorm)) {
             return 2.0; // prefix match
         }
 
@@ -151,6 +159,6 @@ readonly class SearchService
 
     public function clearCache(int $tenantId): void
     {
-        Cache::flush(); // In production, use more targeted cache invalidation
+        Cache::flush();
     }
 }

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->json('new_values')->nullable();
             $table->string('ip_address')->nullable();
             $table->string('user_agent')->nullable();
+            $table->json('metadata')->nullable();
             $table->timestamps();
             $table->index(['tenant_id', 'created_at']);
             $table->index(['model_type', 'model_id']);

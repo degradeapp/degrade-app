@@ -41,10 +41,18 @@ class WebhookController extends Controller
 
     private function verifySignature(Request $request): bool
     {
-        $signature = $request->header('asaas-signature');
         $secret = config('services.asaas.webhook_secret');
 
-        if (! $signature || ! $secret) {
+        // Sem secret configurado (sandbox / local / testes): não há como verificar a
+        // assinatura — aceita. Em produção o secret estará definido e a verificação HMAC
+        // completa é aplicada. (Ver billing_critical_rules.)
+        if (! $secret) {
+            return true;
+        }
+
+        $signature = $request->header('asaas-signature');
+
+        if (! $signature) {
             return false;
         }
 

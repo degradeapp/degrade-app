@@ -9,6 +9,8 @@ class AppointmentResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $effectiveStatus = $this->effectiveStatus();
+
         return [
             'id' => $this->id,
             'customer' => [
@@ -21,9 +23,12 @@ class AppointmentResource extends JsonResource
                 'name' => $this->barber->name,
                 'phone' => $this->barber->phone,
             ] : null,
-            'services' => AppointmentServiceResource::collection($this->whenLoaded('services')),
-            'status' => $this->status->value,
-            'status_label' => $this->status->label(),
+            // resolve() achata pra array puro — sem o wrapper "data" que uma resource
+            // collection aninhada adicionaria e que quebrava o consumo no frontend.
+            'services' => $this->whenLoaded('services', fn () => AppointmentServiceResource::collection($this->services)->resolve()),
+            'status' => $effectiveStatus->value,
+            'status_label' => $effectiveStatus->label(),
+            'persisted_status' => $this->status->value,
             'source' => $this->source->value,
             'source_label' => $this->source->label(),
             'starts_at' => $this->starts_at?->toIso8601String(),
@@ -34,4 +39,5 @@ class AppointmentResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
+
 }

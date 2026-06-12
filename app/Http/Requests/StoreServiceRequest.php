@@ -14,10 +14,9 @@ class StoreServiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:255|unique:services,name,NULL,id,tenant_id,'.auth()->user()->tenant_id.',deleted_at,NULL',
-            'description' => 'nullable|string',
-            'duration_minutes' => 'required|integer|min:1',
-            'price' => 'required|numeric|min:0',
+            'name' => 'required|string|max:80|unique:services,name,NULL,id,tenant_id,'.auth()->user()->tenant_id.',deleted_at,NULL',
+            'description' => 'nullable|string|max:500',
+            'price' => 'required|numeric|min:0|max:999999',
             'commission_percentage' => 'nullable|numeric|min:0|max:100',
         ];
     }

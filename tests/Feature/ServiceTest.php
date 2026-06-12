@@ -67,7 +67,7 @@ class ServiceTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $response = $this->postJson('/services', [
+        $response = $this->postJson('/api/services', [
             'name' => 'Corte Simples',
             'description' => 'Corte de cabelo',
             'duration_minutes' => 30,
@@ -80,7 +80,6 @@ class ServiceTest extends TestCase
                 'id',
                 'name',
                 'description',
-                'duration_minutes',
                 'price',
                 'commission_percentage',
                 'is_active',
@@ -98,7 +97,7 @@ class ServiceTest extends TestCase
     {
         $this->actingAs($this->manager);
 
-        $response = $this->postJson('/services', [
+        $response = $this->postJson('/api/services', [
             'name' => 'Barba',
             'duration_minutes' => 20,
             'price' => 40.00,
@@ -114,7 +113,7 @@ class ServiceTest extends TestCase
     {
         $this->actingAs($this->receptionist);
 
-        $response = $this->postJson('/services', [
+        $response = $this->postJson('/api/services', [
             'name' => 'Test Service',
             'duration_minutes' => 30,
             'price' => 50.00,
@@ -127,13 +126,13 @@ class ServiceTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $this->postJson('/services', [
+        $this->postJson('/api/services', [
             'name' => 'Corte Simples',
             'duration_minutes' => 30,
             'price' => 50.00,
         ]);
 
-        $response = $this->postJson('/services', [
+        $response = $this->postJson('/api/services', [
             'name' => 'Corte Simples',
             'duration_minutes' => 30,
             'price' => 50.00,
@@ -147,7 +146,7 @@ class ServiceTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        $this->postJson('/services', [
+        $this->postJson('/api/services', [
             'name' => 'Corte Simples',
             'duration_minutes' => 30,
             'price' => 50.00,
@@ -170,7 +169,7 @@ class ServiceTest extends TestCase
         app()->instance('tenant', $otherTenant);
         $this->actingAs($otherOwner);
 
-        $response = $this->postJson('/services', [
+        $response = $this->postJson('/api/services', [
             'name' => 'Corte Simples',
             'duration_minutes' => 30,
             'price' => 50.00,
@@ -199,9 +198,11 @@ class ServiceTest extends TestCase
             'is_active' => true,
         ]);
 
-        $service2->update(['deleted_at' => now(), 'deleted_by' => $this->owner->id]);
+        $service2->deleted_by = $this->owner->id;
+        $service2->saveQuietly();
+        $service2->delete();
 
-        $response = $this->getJson('/services');
+        $response = $this->getJson('/api/services');
 
         $response->assertStatus(200);
         $ids = $response->json('data.*.id');
@@ -220,7 +221,7 @@ class ServiceTest extends TestCase
             'price' => 50.00,
         ]);
 
-        $response = $this->putJson("/services/{$service->id}", [
+        $response = $this->putJson("/api/services/{$service->id}", [
             'name' => 'Updated Name',
             'duration_minutes' => 45,
             'price' => 60.00,
@@ -231,7 +232,6 @@ class ServiceTest extends TestCase
         $this->assertDatabaseHas('services', [
             'id' => $service->id,
             'name' => 'Updated Name',
-            'duration_minutes' => 45,
             'price' => 60.00,
         ]);
     }
@@ -247,7 +247,7 @@ class ServiceTest extends TestCase
             'price' => 50.00,
         ]);
 
-        $response = $this->deleteJson("/services/{$service->id}");
+        $response = $this->deleteJson("/api/services/{$service->id}");
 
         $response->assertStatus(204);
 
@@ -270,9 +270,9 @@ class ServiceTest extends TestCase
             'price' => 50.00,
         ]);
 
-        $this->deleteJson("/services/{$service->id}");
+        $this->deleteJson("/api/services/{$service->id}");
 
-        $response = $this->getJson('/services');
+        $response = $this->getJson('/api/services');
         $ids = $response->json('data.*.id');
 
         $this->assertNotContains($service->id, $ids);
@@ -289,7 +289,7 @@ class ServiceTest extends TestCase
             'price' => 50.00,
         ]);
 
-        $response = $this->postJson("/services/{$service->id}/barbers/{$this->barber->id}", [
+        $response = $this->postJson("/api/services/{$service->id}/barbers/{$this->barber->id}", [
             'commission_percentage' => 15,
         ]);
 
@@ -315,7 +315,7 @@ class ServiceTest extends TestCase
             'commission_percentage' => 20,
         ]);
 
-        $this->postJson("/services/{$service->id}/barbers/{$this->barber->id}", [
+        $this->postJson("/api/services/{$service->id}/barbers/{$this->barber->id}", [
             'commission_percentage' => 25,
         ]);
 
@@ -337,7 +337,7 @@ class ServiceTest extends TestCase
 
         $service->barbers()->attach($this->barber->id, ['commission_percentage' => 15]);
 
-        $response = $this->deleteJson("/services/{$service->id}/barbers/{$this->barber->id}");
+        $response = $this->deleteJson("/api/services/{$service->id}/barbers/{$this->barber->id}");
 
         $response->assertStatus(204);
 
@@ -359,7 +359,7 @@ class ServiceTest extends TestCase
             'commission_percentage' => null,
         ]);
 
-        $this->postJson("/services/{$service->id}/barbers/{$this->barber->id}");
+        $this->postJson("/api/services/{$service->id}/barbers/{$this->barber->id}");
 
         $pivot = $service->barbers()->find($this->barber->id)->pivot;
 
@@ -420,8 +420,47 @@ class ServiceTest extends TestCase
         app()->instance('tenant', $otherTenant);
         $this->actingAs($otherOwner);
 
-        $response = $this->getJson("/services/{$service->id}");
+        $response = $this->getJson("/api/services/{$service->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
+    }
+
+    public function test_bulk_store_creates_multiple_services(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/services/bulk', [
+            'services' => [
+                ['name' => 'Corte Degradê', 'price' => 40],
+                ['name' => 'Barba', 'price' => 30],
+            ],
+        ])->assertStatus(201);
+
+        $this->assertDatabaseHas('services', ['tenant_id' => $this->tenant->id, 'name' => 'Corte Degradê', 'price' => 40]);
+        $this->assertDatabaseHas('services', ['tenant_id' => $this->tenant->id, 'name' => 'Barba', 'price' => 30]);
+    }
+
+    public function test_bulk_store_updates_existing_service_price(): void
+    {
+        $this->actingAs($this->owner);
+
+        Service::create(['tenant_id' => $this->tenant->id, 'name' => 'Corte', 'price' => 99, 'commission_percentage' => 50]);
+
+        $this->postJson('/api/services/bulk', [
+            'services' => [['name' => 'Corte', 'price' => 40]],
+        ])->assertStatus(201);
+
+        // Não duplica, ATUALIZA o preço, e preserva a comissão (não foi enviada)
+        $this->assertSame(1, Service::where('tenant_id', $this->tenant->id)->where('name', 'Corte')->count());
+        $service = Service::where('tenant_id', $this->tenant->id)->where('name', 'Corte')->first();
+        $this->assertEquals(40, $service->price);
+        $this->assertEquals(50, $service->commission_percentage);
+    }
+
+    public function test_bulk_store_requires_services(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/services/bulk', ['services' => []])->assertStatus(422);
     }
 }

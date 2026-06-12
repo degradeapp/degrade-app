@@ -16,11 +16,12 @@ class TenantSeeder extends Seeder
                 'slug' => 'test-tenant',
                 'status' => 'active',
                 'trial_ends_at' => null,
+                'onboarding_completed_at' => now(),
                 'settings' => json_encode([
                     'timezone' => 'America/Manaus',
                     'locale' => 'pt_BR',
                     'financial' => [
-                        'default_commission_percentage' => 15,
+                        'default_commission_percentage' => 50,
                     ],
                 ]),
                 'created_at' => now(),

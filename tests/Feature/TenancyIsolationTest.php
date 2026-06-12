@@ -88,9 +88,7 @@ class TenancyIsolationTest extends TestCase
             'role' => 'owner',
         ]);
 
-        if (config('app.env') !== 'testing') {
-            $this->expectException(\Exception::class);
-            $user->update(['tenant_id' => $tenant2->id]);
-        }
+        $this->expectException(\Exception::class);
+        $user->update(['tenant_id' => $tenant2->id]);
     }
 }

@@ -14,6 +14,7 @@ use App\Modules\Service\Actions\DetachBarberService;
 use App\Modules\Service\Actions\UpdateService;
 use App\Modules\Service\Models\Service;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -21,7 +22,17 @@ class ServiceController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        $services = Service::with('barbers')->paginate(15);
+        $query = Service::with('barbers');
+
+        if ($q = request('q')) {
+            $query->where('name', 'like', "%{$q}%");
+        }
+
+        if (request()->has('is_active')) {
+            $query->where('is_active', request()->boolean('is_active'));
+        }
+
+        $services = $query->orderBy('name')->paginate(request('per_page', 50));
 
         return ServiceResource::collection($services);
     }
@@ -30,7 +41,6 @@ class ServiceController extends Controller
     {
         $service = $action(
             name: $request->input('name'),
-            durationMinutes: $request->input('duration_minutes'),
             price: $request->input('price'),
             description: $request->input('description'),
             commissionPercentage: $request->input('commission_percentage'),
@@ -38,6 +48,43 @@ class ServiceController extends Controller
 
         return response()->json(
             new ServiceResource($service->load('barbers')),
+            Response::HTTP_CREATED
+        );
+    }
+
+    /**
+     * Cria vários serviços de uma vez (serviços comuns + preço base).
+     * Ignora os que já existem (mesmo nome no tenant).
+     */
+    public function bulkStore(Request $request): JsonResponse
+    {
+        $request->validate([
+            'services' => 'required|array|min:1',
+            'services.*.name' => 'required|string|max:80',
+            'services.*.price' => 'required|numeric|min:0|max:999999',
+            'services.*.commission_percentage' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $saved = collect();
+
+        foreach ($request->input('services') as $item) {
+            // Upsert por nome: cria os novos e ATUALIZA o preço dos que já existem.
+            $service = Service::firstOrNew(['tenant_id' => $tenantId, 'name' => $item['name']]);
+            $service->price = (float) $item['price'];
+            $service->is_active = true;
+
+            // Só mexe na comissão se foi informada — não apaga a comissão existente.
+            if (isset($item['commission_percentage']) && $item['commission_percentage'] !== null) {
+                $service->commission_percentage = (float) $item['commission_percentage'];
+            }
+
+            $service->save();
+            $saved->push($service);
+        }
+
+        return response()->json(
+            ['data' => ServiceResource::collection($saved->each->load('barbers'))],
             Response::HTTP_CREATED
         );
     }
@@ -56,7 +103,6 @@ class ServiceController extends Controller
         $updated = $action(
             service: $service,
             name: $request->input('name'),
-            durationMinutes: $request->input('duration_minutes'),
             price: $request->input('price'),
             description: $request->input('description'),
             commissionPercentage: $request->input('commission_percentage'),

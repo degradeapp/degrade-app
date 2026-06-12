@@ -35,6 +35,7 @@ test('audit logs customer update', function () {
 
     $this->actingAs($owner);
 
+    $originalName = $customer->name;
     $customer->update(['name' => 'Updated Name']);
 
     $log = DB::table('activity_log')
@@ -44,7 +45,7 @@ test('audit logs customer update', function () {
 
     expect($log)->not->toBeNull();
     expect($log->model_type)->toBe(Customer::class);
-    expect($log->old_values)->toContain($customer->getOriginal('name'));
+    expect($log->old_values)->toContain($originalName);
 });
 
 test('audit logs customer deletion', function () {
@@ -74,10 +75,10 @@ test('audit logs are tenant isolated', function () {
     $owner2 = User::factory()->create(['tenant_id' => $tenant2->id, 'role' => 'owner']);
 
     $this->actingAs($owner1);
-    Customer::create(['tenant_id' => $tenant1->id, 'name' => 'Customer 1']);
+    Customer::create(['tenant_id' => $tenant1->id, 'name' => 'Customer 1', 'phone' => '92991110001']);
 
     $this->actingAs($owner2);
-    Customer::create(['tenant_id' => $tenant2->id, 'name' => 'Customer 2']);
+    Customer::create(['tenant_id' => $tenant2->id, 'name' => 'Customer 2', 'phone' => '92991110002']);
 
     $logs1 = DB::table('activity_log')->where('tenant_id', $tenant1->id)->count();
     $logs2 = DB::table('activity_log')->where('tenant_id', $tenant2->id)->count();

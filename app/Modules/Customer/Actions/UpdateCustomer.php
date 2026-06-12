@@ -9,7 +9,7 @@ readonly class UpdateCustomer
     public function __invoke(
         Customer $customer,
         string $name,
-        string $phone,
+        ?string $phone = null,
         ?string $email = null,
     ): Customer {
         $customer->update([

@@ -12,7 +12,7 @@ class EnsureActiveSubscription
         if ($request->user()) {
             $tenant = $request->user()->tenant;
 
-            if (! $tenant->isActive() && ! $tenant->isTrialing()) {
+            if ($tenant && ! $tenant->isActive() && ! $tenant->isTrialing()) {
                 return redirect('/billing')->with('error', 'Assinatura inativa ou expirada');
             }
         }

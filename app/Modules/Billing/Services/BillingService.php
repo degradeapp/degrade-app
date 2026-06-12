@@ -16,7 +16,7 @@ class BillingService
 
     public function __construct()
     {
-        $this->apiKey = config('services.asaas.api_key', '');
+        $this->apiKey = config('services.asaas.api_key') ?? '';
         $this->baseUrl = config('services.asaas.sandbox') ? 'https://sandbox.asaas.com/api/v3' : 'https://api.asaas.com/api/v3';
     }
 
@@ -27,12 +27,13 @@ class BillingService
 
             $response = Http::withHeaders([
                 'accept' => 'application/json',
+                'access_token' => $this->apiKey,
             ])->asForm()->post($this->baseUrl.'/customers', [
                 'name' => $tenant->name,
                 'email' => $owner?->email ?? 'noemail@example.com',
                 'phone' => '11999999999', // Placeholder: should be from owner profile
                 'cpfCnpj' => '00000000000000', // Placeholder: should be from tenant settings
-            ])->withToken($this->apiKey)
+            ])
                 ->throw()
                 ->json();
 
@@ -69,6 +70,7 @@ class BillingService
 
             $response = Http::withHeaders([
                 'accept' => 'application/json',
+                'access_token' => $this->apiKey,
             ])->asForm()->post($this->baseUrl.'/subscriptions', [
                 'customerId' => $customerId,
                 'billingType' => 'UNDEFINED',
@@ -76,7 +78,7 @@ class BillingService
                 'nextDueDate' => now()->addMonth()->format('Y-m-d'),
                 'cycle' => 'MONTHLY',
                 'description' => 'Plano '.$plan->label(),
-            ])->withToken($this->apiKey)
+            ])
                 ->throw()
                 ->json();
 
@@ -127,7 +129,7 @@ class BillingService
                 throw new \Exception('No subscription ID found for tenant');
             }
 
-            Http::withToken($this->apiKey)
+            Http::withHeaders(['access_token' => $this->apiKey])
                 ->delete($this->baseUrl.'/subscriptions/'.$tenant->asaas_subscription_id)
                 ->throw();
 

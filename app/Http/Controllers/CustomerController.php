@@ -17,7 +17,19 @@ class CustomerController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
-        $customers = Customer::paginate(15);
+        $query = Customer::query();
+
+        if ($q = request('q')) {
+            $digits = preg_replace('/\D/', '', $q) ?: '';
+            $query->where(function ($w) use ($q, $digits) {
+                $w->where('name', 'like', "%{$q}%");
+                if ($digits !== '') {
+                    $w->orWhere('phone', 'like', "%{$digits}%");
+                }
+            });
+        }
+
+        $customers = $query->orderBy('name')->paginate(request('per_page', 50));
 
         return CustomerResource::collection($customers);
     }
@@ -29,6 +41,10 @@ class CustomerController extends Controller
             phone: $request->input('phone'),
             email: $request->input('email'),
         );
+
+        if ($request->filled('notes')) {
+            $customer->update(['notes' => $request->input('notes')]);
+        }
 
         return response()->json(
             new CustomerResource($customer),
@@ -54,7 +70,11 @@ class CustomerController extends Controller
             email: $request->input('email'),
         );
 
-        return response()->json(new CustomerResource($updated));
+        if ($request->has('notes')) {
+            $updated->update(['notes' => $request->input('notes')]);
+        }
+
+        return response()->json(new CustomerResource($updated->fresh()));
     }
 
     public function destroy(Customer $customer, DeleteCustomer $action): Response

@@ -11,10 +11,10 @@ return new class extends Migration
         Schema::create('barbers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('phone')->nullable();
-            $table->decimal('default_commission_percentage', 5, 2)->default(15);
+            $table->decimal('default_commission_percentage', 5, 2)->default(0);
             $table->boolean('is_active')->default(true);
             $table->softDeletesDatetime('deleted_at');
             $table->unsignedBigInteger('deleted_by')->nullable();

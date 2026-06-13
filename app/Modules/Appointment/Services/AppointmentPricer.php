@@ -26,10 +26,19 @@ class AppointmentPricer
         array $barberIds = [],
         array $priceOverrides = []
     ): void {
+        // E3: pré-carrega TODOS os barbeiros envolvidos com o pivot de serviços de
+        // uma vez só. Antes era Barber::find() + services()->first() DENTRO do loop
+        // (N+1: ~2 queries por serviço); agora é 1 query, resolvida em memória.
+        $barberIdsUnique = collect($barberIds)->filter()->unique()->values();
+        $barbers = $barberIdsUnique->isEmpty()
+            ? collect()
+            : Barber::with('services')->whereIn('id', $barberIdsUnique)->get()->keyBy('id');
+
         foreach ($services as $index => $service) {
             $barberId = $barberIds[$index] ?? null;
+            $barber = $barberId ? $barbers->get($barberId) : null;
 
-            $commissionPercentage = $this->resolveCommission($service, $barberId);
+            $commissionPercentage = $this->resolveCommission($service, $barber);
 
             $appointment->services()->create([
                 'service_id' => $service->id,
@@ -40,26 +49,27 @@ class AppointmentPricer
         }
     }
 
-    private function resolveCommission(Service $service, ?int $barberId): ?float
+    private function resolveCommission(Service $service, ?Barber $barber): ?float
     {
-        if ($barberId) {
-            $barber = Barber::find($barberId);
-            if ($barber) {
-                $pivot = $barber->services()->where('service_id', $service->id)->first();
-                if ($pivot && $pivot->pivot->commission_percentage !== null) {
-                    return (float) $pivot->pivot->commission_percentage;
-                }
+        // 1) Comissão específica do barbeiro PARA este serviço (pivot já carregado).
+        if ($barber) {
+            $pivotService = $barber->services->firstWhere('id', $service->id);
+            if ($pivotService && $pivotService->pivot->commission_percentage !== null) {
+                return (float) $pivotService->pivot->commission_percentage;
             }
         }
 
+        // 2) Comissão padrão do serviço.
         if ($service->commission_percentage !== null) {
             return (float) $service->commission_percentage;
         }
 
-        if ($barberId && isset($barber) && $barber) {
+        // 3) Comissão padrão do barbeiro.
+        if ($barber) {
             return (float) $barber->default_commission_percentage;
         }
 
+        // 4) Padrão financeiro do tenant.
         $tenant = app('tenant');
         $settings = is_string($tenant->settings ?? null) ? json_decode($tenant->settings, true) : ($tenant->settings ?? []);
         $tenantDefault = data_get($settings, 'financial.default_commission_percentage');

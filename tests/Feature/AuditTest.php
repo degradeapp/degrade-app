@@ -131,3 +131,29 @@ test('audit logs are immutable', function () {
     $updatedLog = DB::table('activity_log')->where('id', $initialLog->id)->first();
     expect($updatedLog->action)->toBe('modified'); // This shows logs CAN be modified, but shouldn't be in practice
 });
+
+test('audit endpoint paginates (E5) and keeps the data contract', function () {
+    $tenant = Tenant::factory()->create();
+    $owner = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'owner']);
+
+    // 60 entradas de auditoria pra forçar mais de uma página (per_page padrão = 50).
+    $rows = collect(range(1, 60))->map(fn ($i) => [
+        'tenant_id' => $tenant->id,
+        'user_id' => $owner->id,
+        'action' => 'created',
+        'model_type' => Customer::class,
+        'model_id' => $i,
+        'new_values' => json_encode(['name' => "Cliente {$i}"]),
+        'created_at' => now()->subSeconds($i),
+        'updated_at' => now(),
+    ])->all();
+    DB::table('activity_log')->insert($rows);
+
+    $page1 = $this->actingAs($owner)->getJson('/api/audit')->assertOk();
+    expect($page1->json('data'))->toHaveCount(50)
+        ->and($page1->json('meta.total'))->toBe(60)
+        ->and($page1->json('meta.last_page'))->toBe(2);
+
+    $page2 = $this->actingAs($owner)->getJson('/api/audit?page=2')->assertOk();
+    expect($page2->json('data'))->toHaveCount(10);
+});

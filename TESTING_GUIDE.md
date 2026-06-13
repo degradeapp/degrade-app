@@ -1,6 +1,6 @@
 # 🧪 Degradê — Guia de Validação & Roadmap
 
-> Atualizado: **13/06/2026**. Suíte: **315 testes verdes**. Roda 100% local sem custo
+> Atualizado: **13/06/2026**. Suíte: **325 testes verdes**. Roda 100% local sem custo
 > (SQLite, MAIL=log, Asaas sandbox). Integrações externas (WhatsApp/Email/Asaas live)
 > estão **congeladas** por decisão do dono.
 
@@ -67,14 +67,22 @@ npm run dev              # Vite com hot-reload (mudança aparece na hora)
 Aplicado nesta sessão (315 verdes, 0 regressão): link público + 3 correções de segurança:
 escopa `exists` por tenant nos requests de agendamento (IDOR de escrita), assinatura
 `X-Hub-Signature-256` no webhook do WhatsApp, e `BasePolicy::before` do dono não cruza tenant.
-Pendente, em ordem de valor (detalhe em `fable5/RELATORIO_SEGURANCA.md` e `RELATORIO_EFICIENCIA.md`):
-- [ ] **B1 (segurança):** `subscription.active` (variante JSON 402/403) nas rotas `/api/*` — hoje
-      tenant suspenso/cancelado segue operando via API (só as páginas web barram).
-- [ ] **Grep `exists:` sem escopo** nos demais FormRequests (`StoreBarberRequest.user_id` é o próximo).
-- [ ] **E1 (eficiência):** busca no banco (pg_trgm) em vez de em PHP no `SearchService`;
-      e trocar `Cache::flush()` global por chave versionada por tenant.
-- [ ] **E2/E3:** N+1 do dashboard (`timeOffs` por barbeiro) e do `AppointmentPricer` (loop de serviços).
-- [ ] **E5:** paginar a auditoria (`limit(100)` → cursor).
+Concluído (detalhe em `fable5/RELATORIO_SEGURANCA.md` e `RELATORIO_EFICIENCIA.md`):
+- [x] **B1 (segurança):** `subscription.active` (JSON 402) nas rotas `/api/*` operacionais
+      (appointments, customers, barbers, services, commissions, reports, units, whatsapp inbox,
+      search). Conta/billing/auth/`/switch`/credenciais ficam abertos pra regularizar. `SubscriptionGateTest`.
+- [x] **`exists:` escopado por tenant** em `StoreBarberRequest.user_id` (varredura concluída; era o último).
+- [x] **E1:** `SearchService` filtra no banco em Postgres (unaccent ILIKE + GIN/pg_trgm via migration;
+      SQLite mantém o filtro em memória) e o cache invalida por tenant (fim do `Cache::flush()` global).
+- [x] **E2/E3:** N+1 removido (dashboard carrega `timeOffs` de hoje via eager load; `AppointmentPricer`
+      pré-carrega barbeiros+pivot uma vez). `EfficiencyTest` prova que não escala com o nº de itens.
+- [x] **E5:** auditoria paginada (`paginate`, `data` + `meta`, contrato preservado).
+- [x] **B4 (LGPD):** webhook do WhatsApp não loga mais o payload completo (telefone/texto do cliente).
+
+Ainda em aberto (menor prioridade / fase deploy): B2 (falhar hard se secret de webhook vazio em
+produção), B3 (convite permite 2º dono — confirmar se é intencional), E4 (janela de 60 dias da
+agenda — acoplado ao front), E6 (Commission.pendingSummary agrupa em PHP), E8 (listener de cache
+de disponibilidade morto). Detalhe nos relatórios.
 
 ## 🔌 Falta INTEGRAR (externo — congelado)
 - [ ] ⚠️ **WhatsApp Cloud API** — hoje dev/manual; produção precisa de Embedded Signup

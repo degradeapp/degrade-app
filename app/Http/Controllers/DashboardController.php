@@ -6,6 +6,7 @@ use App\Enums\AppointmentStatus;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Commission\Models\Commission;
+use App\Modules\Tenant\Services\UnitContext;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,7 +23,7 @@ class DashboardController extends Controller
 
         // Escopo de unidade: barbeiro/recepção veem só a sua; dono/gerente veem a unidade
         // selecionada OU consolidado (null = todas). Tenant sem unidade (teste antigo) = todas.
-        $unitId = app(\App\Modules\Tenant\Services\UnitContext::class)->scopedUnitId();
+        $unitId = app(UnitContext::class)->scopedUnitId();
 
         $today = Carbon::now()->startOfDay();
         $tomorrow = $today->copy()->addDay();
@@ -183,20 +184,22 @@ class DashboardController extends Controller
         $today = $now->toDateString();
 
         // Expediente da unidade ativa (consolidado = todos os barbeiros do tenant).
+        // E2: folga de HOJE carregada junto (eager load), em vez de um exists()
+        // por barbeiro dentro do loop (N+1).
         $barbers = Barber::where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->when($unitId !== null, fn ($q) => $q->where('unit_id', $unitId))
-            ->with(['schedules' => fn ($q) => $q->where('day_of_week', $dow)])
+            ->with([
+                'schedules' => fn ($q) => $q->where('day_of_week', $dow),
+                'timeOffs' => fn ($q) => $q->where('date', '<=', $today)
+                    ->whereRaw('COALESCE(end_date, date) >= ?', [$today]),
+            ])
             ->get();
 
         $availableMinutes = 0;
         foreach ($barbers as $barber) {
-            $onTimeOff = $barber->timeOffs()
-                ->where('date', '<=', $today)
-                ->whereRaw('COALESCE(end_date, date) >= ?', [$today])
-                ->exists();
-            if ($onTimeOff) {
-                continue;
+            if ($barber->timeOffs->isNotEmpty()) {
+                continue; // barbeiro de folga hoje não conta pra capacidade
             }
             foreach ($barber->schedules as $sch) {
                 $availableMinutes += $this->minutesBetween($sch->start_time, $sch->end_time);

@@ -5,8 +5,10 @@ namespace App\Modules\Search;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 readonly class SearchService
@@ -27,7 +29,7 @@ readonly class SearchService
             ];
         }
 
-        $cacheKey = "search:{$tenantId}:".hash('sha256', mb_strtolower($query)).":page:{$page}";
+        $cacheKey = "search:{$tenantId}:v".$this->cacheVersion($tenantId).':'.hash('sha256', mb_strtolower($query)).":page:{$page}";
         $cached = Cache::get($cacheKey);
         if ($cached) {
             return $cached;
@@ -80,10 +82,37 @@ readonly class SearchService
         return $digits !== '' && str_contains($this->digitsOnly($phone), $digits);
     }
 
+    /**
+     * E1: em Postgres (prod) narra os candidatos NO BANCO (unaccent ILIKE no nome
+     * + dígitos do telefone), evitando hidratar a tabela inteira. O filtro em PHP
+     * abaixo continua sendo a AUTORIDADE do match, então o resultado é idêntico em
+     * qualquer banco — aqui só reduzimos I/O. SQLite (dev/teste) não pré-filtra: o
+     * volume é pequeno e LIKE no SQLite não é accent-insensitive como o filtro PHP.
+     */
+    private function prefilter(Builder $q, string $query, bool $withPhone): Builder
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return $q;
+        }
+
+        $like = '%'.mb_strtolower(trim($query)).'%';
+        $digits = $this->digitsOnly($query);
+
+        return $q->where(function (Builder $w) use ($like, $digits, $withPhone) {
+            $w->whereRaw('unaccent(lower(name)) like unaccent(?)', [$like]);
+            if ($withPhone && $digits !== '') {
+                $w->orWhereRaw("regexp_replace(coalesce(phone, ''), '\\D', '', 'g') like ?", ['%'.$digits.'%']);
+            }
+        });
+    }
+
     private function searchCustomers(int $tenantId, string $query): Collection
     {
-        return Customer::where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
+        return $this->prefilter(
+            Customer::where('tenant_id', $tenantId)->whereNull('deleted_at'),
+            $query,
+            withPhone: true,
+        )
             ->get()
             ->filter(fn (Customer $c) => $this->matchesName($c->name, $query) || $this->matchesPhone($c->phone, $query))
             ->map(fn (Customer $customer) => [
@@ -103,8 +132,11 @@ readonly class SearchService
 
     private function searchBarbers(int $tenantId, string $query): Collection
     {
-        return Barber::where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
+        return $this->prefilter(
+            Barber::where('tenant_id', $tenantId)->whereNull('deleted_at'),
+            $query,
+            withPhone: true,
+        )
             ->get()
             ->filter(fn (Barber $b) => $this->matchesName($b->name, $query) || $this->matchesPhone($b->phone, $query))
             ->map(fn (Barber $barber) => [
@@ -123,8 +155,11 @@ readonly class SearchService
 
     private function searchServices(int $tenantId, string $query): Collection
     {
-        return Service::where('tenant_id', $tenantId)
-            ->whereNull('deleted_at')
+        return $this->prefilter(
+            Service::where('tenant_id', $tenantId)->whereNull('deleted_at'),
+            $query,
+            withPhone: false,
+        )
             ->get()
             ->filter(fn (Service $s) => $this->matchesName($s->name, $query))
             ->map(fn (Service $service) => [
@@ -157,8 +192,18 @@ readonly class SearchService
         return 1.0; // substring match
     }
 
+    private function cacheVersion(int $tenantId): int
+    {
+        return (int) Cache::get("search:{$tenantId}:ver", 1);
+    }
+
+    /**
+     * Invalida o cache de busca SÓ deste tenant. Antes era Cache::flush(), que
+     * apagava o cache do app inteiro (de TODOS os tenants) a cada alteração.
+     * Versão por tenant: as chaves antigas simplesmente deixam de ser lidas.
+     */
     public function clearCache(int $tenantId): void
     {
-        Cache::flush();
+        Cache::put("search:{$tenantId}:ver", $this->cacheVersion($tenantId) + 1);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,9 +15,12 @@ class ActivityLogController extends Controller
         return Inertia::render('Audit/Index');
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $tenantId = app('tenant')->id;
+        // Paginado: a auditoria cresce sem teto. Mantém `data` como o array de
+        // itens (contrato antigo) e acrescenta `meta` pra navegação de páginas.
+        $perPage = max(10, min((int) $request->integer('per_page', 50), 100));
 
         // Tipo do modelo em pt-BR (minúsculo, pra ler "Criou serviço").
         $typeLabels = [
@@ -33,7 +37,7 @@ class ActivityLogController extends Controller
             'Subscription' => 'assinatura',
         ];
 
-        $logs = DB::table('activity_log')
+        $paginator = DB::table('activity_log')
             ->leftJoin('users', 'users.id', '=', 'activity_log.user_id')
             ->where('activity_log.tenant_id', $tenantId)
             ->select(
@@ -49,8 +53,9 @@ class ActivityLogController extends Controller
                 'users.email as user_email',
             )
             ->orderByDesc('activity_log.created_at')
-            ->limit(100)
-            ->get()
+            ->paginate($perPage);
+
+        $logs = collect($paginator->items())
             ->map(function ($r) use ($typeLabels) {
                 $basename = class_basename($r->model_type ?? '');
 
@@ -72,7 +77,15 @@ class ActivityLogController extends Controller
                 ];
             });
 
-        return response()->json(['data' => $logs]);
+        return response()->json([
+            'data' => $logs,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     /**

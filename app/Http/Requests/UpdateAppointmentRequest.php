@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateAppointmentRequest extends FormRequest
 {
@@ -13,11 +14,14 @@ class UpdateAppointmentRequest extends FormRequest
 
     public function rules(): array
     {
+        // Mesma regra do Store: 'exists' SEMPRE escopado pelo tenant (IDOR de escrita).
+        $tenantId = auth()->user()->tenant_id;
+
         return [
             'service_ids' => 'nullable|array|min:1',
-            'service_ids.*' => 'exists:services,id',
+            'service_ids.*' => [Rule::exists('services', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'barber_ids' => 'nullable|array',
-            'barber_ids.*' => 'nullable|exists:barbers,id',
+            'barber_ids.*' => ['nullable', Rule::exists('barbers', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'starts_at' => 'nullable|date_format:Y-m-d\TH:i:s|after:now',
             'notes' => 'nullable|string|max:100',
         ];

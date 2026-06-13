@@ -28,6 +28,17 @@ class WhatsappController extends Controller
 
     public function webhook(Request $request): Response
     {
+        // SEGURANÇA: a Meta assina todo POST com X-Hub-Signature-256 (HMAC do corpo
+        // com o App Secret). Sem essa checagem, qualquer um que descubra a URL
+        // injeta "mensagens" falsas e cria agendamentos/conversas em nome de
+        // clientes. Mesmo padrão do webhook Asaas: sem secret configurado
+        // (dev/local/teste) não há como verificar — aceita; com secret, exige.
+        if (! $this->verifySignature($request)) {
+            Log::warning('WhatsApp webhook signature verification failed');
+
+            return response('Unauthorized', Response::HTTP_UNAUTHORIZED);
+        }
+
         $payload = $request->all();
         Log::info('WhatsApp webhook received', ['payload' => $payload]);
 
@@ -60,6 +71,26 @@ class WhatsappController extends Controller
         }
 
         return response('', 200);
+    }
+
+    private function verifySignature(Request $request): bool
+    {
+        $secret = config('services.whatsapp.app_secret');
+
+        if (! $secret) {
+            return true; // dev/local/teste: sem secret não há o que verificar
+        }
+
+        $header = (string) $request->header('X-Hub-Signature-256', '');
+
+        if (! str_starts_with($header, 'sha256=')) {
+            return false;
+        }
+
+        $expected = 'sha256='.hash_hmac('sha256', $request->getContent(), $secret);
+
+        // Comparação em tempo constante (anti timing attack), igual ao Asaas.
+        return hash_equals($expected, $header);
     }
 
     public function listAccounts(): JsonResponse

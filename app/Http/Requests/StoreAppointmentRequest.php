@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreAppointmentRequest extends FormRequest
 {
@@ -13,12 +14,18 @@ class StoreAppointmentRequest extends FormRequest
 
     public function rules(): array
     {
+        // SEGURANÇA: 'exists' sempre escopado pelo tenant do usuário logado.
+        // 'exists:customers,id' puro aceitaria um id de OUTRO tenant (a regra
+        // consulta a tabela sem o TenantScope), permitindo vincular um
+        // agendamento a cliente/barbeiro alheio (IDOR de escrita).
+        $tenantId = auth()->user()->tenant_id;
+
         return [
-            'customer_id' => 'required|exists:customers,id',
+            'customer_id' => ['required', Rule::exists('customers', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'service_ids' => 'required|array|min:1',
-            'service_ids.*' => 'exists:services,id',
+            'service_ids.*' => [Rule::exists('services', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'barber_ids' => 'nullable|array',
-            'barber_ids.*' => 'nullable|exists:barbers,id',
+            'barber_ids.*' => ['nullable', Rule::exists('barbers', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             // Override de preço por serviço só para este atendimento (id => valor).
             'prices' => 'nullable|array',
             'prices.*' => 'nullable|numeric|min:0|max:999999',

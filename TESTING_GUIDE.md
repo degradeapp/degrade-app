@@ -1,6 +1,6 @@
 # 🧪 Degradê — Guia de Validação & Roadmap
 
-> Atualizado: **09/06/2026**. Suíte: **272 testes verdes**. Roda 100% local sem custo
+> Atualizado: **13/06/2026**. Suíte: **315 testes verdes**. Roda 100% local sem custo
 > (SQLite, MAIL=log, Asaas sandbox). Integrações externas (WhatsApp/Email/Asaas live)
 > estão **congeladas** por decisão do dono.
 
@@ -59,7 +59,22 @@ npm run dev              # Vite com hot-reload (mudança aparece na hora)
       unidade não vê a agenda da outra.
 
 ## ⚠️ Falta CONSTRUIR (antes de cobrar o plano cheio)
-- [ ] **Link público de agendamento** (cliente marca sozinho, sem ser pelo bot)
+- [x] **Link público de agendamento — BACKEND** (Fable 5): `/api/public/agendar/{slug}`,
+      escopado por slug, isolado por tenant, rate-limited, NÃO encaixa (respeita disponibilidade
+      dura), `source=customer`. 19 testes. Falta a tela Vue `/agendar/{slug}` (fase frontend).
+
+## 🔍 Auditoria backend (Fable 5) — aplicado + follow-ups
+Aplicado nesta sessão (315 verdes, 0 regressão): link público + 3 correções de segurança:
+escopa `exists` por tenant nos requests de agendamento (IDOR de escrita), assinatura
+`X-Hub-Signature-256` no webhook do WhatsApp, e `BasePolicy::before` do dono não cruza tenant.
+Pendente, em ordem de valor (detalhe em `fable5/RELATORIO_SEGURANCA.md` e `RELATORIO_EFICIENCIA.md`):
+- [ ] **B1 (segurança):** `subscription.active` (variante JSON 402/403) nas rotas `/api/*` — hoje
+      tenant suspenso/cancelado segue operando via API (só as páginas web barram).
+- [ ] **Grep `exists:` sem escopo** nos demais FormRequests (`StoreBarberRequest.user_id` é o próximo).
+- [ ] **E1 (eficiência):** busca no banco (pg_trgm) em vez de em PHP no `SearchService`;
+      e trocar `Cache::flush()` global por chave versionada por tenant.
+- [ ] **E2/E3:** N+1 do dashboard (`timeOffs` por barbeiro) e do `AppointmentPricer` (loop de serviços).
+- [ ] **E5:** paginar a auditoria (`limit(100)` → cursor).
 
 ## 🔌 Falta INTEGRAR (externo — congelado)
 - [ ] ⚠️ **WhatsApp Cloud API** — hoje dev/manual; produção precisa de Embedded Signup

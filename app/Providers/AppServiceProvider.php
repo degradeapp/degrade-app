@@ -45,7 +45,9 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * Rate limiters. 'auth' protege contra brute-force/credential-stuffing
-     * (login, registro, reset de senha); 'api' limita abuso por usuário/tenant.
+     * (login, registro, reset de senha); 'api' limita abuso por usuário/tenant;
+     * 'public-booking*' protegem o link público de agendamento (sem auth):
+     * leitura mais folgada, criação bem apertada (anti-flood de agendamento).
      */
     private function configureRateLimiting(): void
     {
@@ -64,6 +66,20 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(120)->by(
                 $request->user()?->id ? 'user:'.$request->user()->id : 'ip:'.$request->ip()
             );
+        });
+
+        // Leituras do link público (catálogo + horários): por IP.
+        RateLimiter::for('public-booking', function (Request $request) {
+            return Limit::perMinute(30)->by('pb:'.$request->ip());
+        });
+
+        // Criação de agendamento público: bem mais restrita, por IP, em duas
+        // janelas (rajada e sustentada). Um cliente real cria 1, talvez 2.
+        RateLimiter::for('public-booking-create', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by('pbc:m:'.$request->ip()),
+                Limit::perHour(20)->by('pbc:h:'.$request->ip()),
+            ];
         });
     }
 }

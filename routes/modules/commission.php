@@ -4,7 +4,7 @@ use App\Http\Controllers\CommissionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->name('api.')->group(function () {
-    Route::middleware('auth:sanctum', 'role:owner,manager')->prefix('commissions')->group(function () {
+    Route::middleware('auth:sanctum', 'role:owner,manager', 'subscription.active')->prefix('commissions')->group(function () {
         Route::get('/', [CommissionController::class, 'index'])->name('commissions.index');
         // Antes de /{commission} pra não serem capturadas como id.
         Route::get('/pending-summary', [CommissionController::class, 'pendingSummary'])->name('commissions.pending-summary');

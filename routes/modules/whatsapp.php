@@ -16,7 +16,7 @@ Route::prefix('api')->name('api.')->group(function () {
     });
 
     // Caixa de entrada (conversas com clientes) = operacional, dono e gerente.
-    Route::middleware('auth:sanctum', 'role:owner,manager')->prefix('whatsapp')->group(function () {
+    Route::middleware('auth:sanctum', 'role:owner,manager', 'subscription.active')->prefix('whatsapp')->group(function () {
         Route::get('/conversations', [WhatsappController::class, 'listConversations'])->name('whatsapp.conversations');
         Route::get('/conversations/{conversation}', [WhatsappController::class, 'showConversation'])->name('whatsapp.conversation.show');
     });

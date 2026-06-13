@@ -40,7 +40,9 @@ class WhatsappController extends Controller
         }
 
         $payload = $request->all();
-        Log::info('WhatsApp webhook received', ['payload' => $payload]);
+        // LGPD: NÃO logar o payload completo (contém telefone e texto da mensagem
+        // do cliente = dado pessoal). Só metadata suficiente pra operar/debugar.
+        Log::info('WhatsApp webhook received', ['entries' => count($payload['entry'] ?? [])]);
 
         $entries = $payload['entry'] ?? [];
         foreach ($entries as $entry) {

@@ -56,6 +56,19 @@ it('rejeita barber_ids e service_ids de outro tenant ao criar agendamento intern
         ->assertUnprocessable();
 });
 
+it('rejeita user_id de outro tenant ao criar barbeiro', function () {
+    $foreignUser = User::factory()->create(['tenant_id' => $this->tenantB->id, 'role' => 'barber']);
+
+    $this->actingAs($this->ownerA)
+        ->postJson('/api/barbers', [
+            'name' => 'Novo Barbeiro',
+            'phone' => '(92) 99912-0760',
+            'user_id' => $foreignUser->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('user_id');
+});
+
 // ---------- A2: assinatura do webhook do WhatsApp ----------
 
 it('rejeita webhook do whatsapp com assinatura invalida quando o app_secret esta configurado', function () {

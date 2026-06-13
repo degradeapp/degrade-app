@@ -4,7 +4,7 @@ use App\Http\Controllers\ServiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->name('api.')->group(function () {
-    Route::middleware('auth:sanctum', 'role:owner,manager')->prefix('services')->group(function () {
+    Route::middleware('auth:sanctum', 'role:owner,manager', 'subscription.active')->prefix('services')->group(function () {
         Route::get('/', [ServiceController::class, 'index'])->name('services.index');
         Route::post('/', [ServiceController::class, 'store'])->name('services.store');
         Route::post('/bulk', [ServiceController::class, 'bulkStore'])->name('services.bulk');

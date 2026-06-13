@@ -10,7 +10,7 @@ Route::prefix('api')->name('api.')->group(function () {
     });
 
     // Gestão de unidades (criar/editar/remover): só o dono.
-    Route::middleware('auth:sanctum', 'role:owner')->prefix('units')->group(function () {
+    Route::middleware('auth:sanctum', 'role:owner', 'subscription.active')->prefix('units')->group(function () {
         Route::get('/', [UnitController::class, 'index'])->name('units.index');
         Route::post('/', [UnitController::class, 'store'])->name('units.store');
         Route::put('/{unit}', [UnitController::class, 'update'])->name('units.update');

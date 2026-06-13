@@ -4,7 +4,7 @@ use App\Http\Controllers\AppointmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->name('api.')->group(function () {
-    Route::middleware('auth:sanctum', 'role:owner,manager,receptionist,barber')->prefix('appointments')->group(function () {
+    Route::middleware('auth:sanctum', 'role:owner,manager,receptionist,barber', 'subscription.active')->prefix('appointments')->group(function () {
         Route::get('/', [AppointmentController::class, 'index'])->name('appointments.index');
         Route::post('/', [AppointmentController::class, 'store'])->name('appointments.store');
         Route::get('/{appointment}', [AppointmentController::class, 'show'])->name('appointments.show');

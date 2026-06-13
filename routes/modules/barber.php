@@ -4,7 +4,7 @@ use App\Http\Controllers\BarberController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->name('api.')->group(function () {
-    Route::middleware('auth:sanctum', 'role:owner,manager')->prefix('barbers')->group(function () {
+    Route::middleware('auth:sanctum', 'role:owner,manager', 'subscription.active')->prefix('barbers')->group(function () {
         Route::get('/', [BarberController::class, 'index'])->name('barbers.index');
         Route::post('/', [BarberController::class, 'store'])->name('barbers.store');
         Route::get('/{barber}', [BarberController::class, 'show'])->name('barbers.show');

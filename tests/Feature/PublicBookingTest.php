@@ -9,6 +9,7 @@ use App\Modules\Unit\Models\Unit;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
 
 uses(RefreshDatabase::class);
 
@@ -65,6 +66,16 @@ beforeEach(function () {
 });
 
 afterEach(fn () => Carbon::setTestNow());
+
+it('serve a pagina publica (inertia) sem login, pra qualquer slug', function () {
+    // A página só resolve o slug no cliente (via API); o servidor renderiza pra
+    // qualquer slug e a tela trata "loja não encontrada". Não exige auth.
+    $this->get('/agendar/barbearia-teste')
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('PublicBooking/Index')
+            ->where('slug', 'barbearia-teste'));
+});
 
 it('mostra o catálogo público sem vazar dados sensíveis', function () {
     $response = $this->getJson('/api/public/agendar/barbearia-teste');

@@ -25,6 +25,12 @@ Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'webL
 Route::inertia('/terms', 'Legal/Terms')->name('terms');
 Route::inertia('/privacy', 'Legal/Privacy')->name('privacy');
 
+// Link público de agendamento — cliente final marca sozinho, SEM login. A página
+// resolve o slug via API; loja inexistente/fora do ar vira "não encontrada" na tela.
+// (Toda a segurança e validação ficam na API /api/public/agendar/{slug}.)
+Route::get('/agendar/{slug}', fn (string $slug) => Inertia::render('PublicBooking/Index', ['slug' => $slug]))
+    ->name('public.booking.page');
+
 // Authenticated routes. As PÁGINAS são gateadas por papel espelhando as APIs — assim
 // navegar direto numa URL sem permissão cai no /403 limpo (não numa tela quebrada).
 Route::middleware(['auth:sanctum', 'subscription.active', 'onboarding.completed'])->group(function () {

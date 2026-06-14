@@ -72,6 +72,11 @@ export const useApi = () => {
       if (parsed.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'
       }
+      // Assinatura inativa/vencida (402) numa rota operacional → vai pra cobrança
+      // regularizar, em vez de deixar a tela quebrada (espelha o 401 → login).
+      if (parsed.status === 402 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/billing')) {
+        window.location.href = '/billing'
+      }
       return parsed
     } catch {
       return { ok: false, status: 0, data: null, message: 'Falha de rede.' }

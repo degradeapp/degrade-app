@@ -59,9 +59,13 @@ npm run dev              # Vite com hot-reload (mudança aparece na hora)
       unidade não vê a agenda da outra.
 
 ## ⚠️ Falta CONSTRUIR (antes de cobrar o plano cheio)
-- [x] **Link público de agendamento — BACKEND** (Fable 5): `/api/public/agendar/{slug}`,
-      escopado por slug, isolado por tenant, rate-limited, NÃO encaixa (respeita disponibilidade
-      dura), `source=customer`. 19 testes. Falta a tela Vue `/agendar/{slug}` (fase frontend).
+- [x] **Link público de agendamento — BACKEND + FRONTEND**: API `/api/public/agendar/{slug}`
+      (escopada por slug, isolada por tenant, rate-limited, não encaixa, `source=customer`) +
+      a tela Vue pública `/agendar/{slug}` (`PublicBooking/Index.vue`): wizard unidade→serviços→
+      profissional→data/hora→contato, dias e horários no fuso da loja, trata 404/422/429. Sem login.
+      **Falta VOCÊ validar** no navegador (abrir `/agendar/<slug-da-loja>` e marcar de ponta a ponta).
+- [x] **402 (assinatura inativa) no front**: `useApi` redireciona pra `/billing` (espelha o 401→login).
+- [x] **Auditoria paginada no front**: `Audit/Index.vue` usa o `meta` com botão "Carregar mais".
 
 ## 🔍 Auditoria backend (Fable 5) — aplicado + follow-ups
 Aplicado nesta sessão (315 verdes, 0 regressão): link público + 3 correções de segurança:

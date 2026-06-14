@@ -27,12 +27,24 @@
           por {{ log.user_name }}
         </p>
       </div>
+
+      <button
+        v-if="hasMore"
+        type="button"
+        :disabled="loadingMore"
+        @click="loadMore"
+        class="w-full h-11 rounded-[10px] border border-[#2A2A2A] text-[13px] font-medium text-[#A1A1A1] hover:text-white hover:border-[#3D3D3D] transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+      >
+        <Loader2 v-if="loadingMore" :size="16" class="animate-spin" />
+        {{ loadingMore ? 'Carregando...' : 'Carregar mais' }}
+      </button>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { Loader2 } from 'lucide-vue-next'
 import AppLayout from '../../layouts/AppLayout.vue'
 import Skeleton from '../../components/Skeleton.vue'
 
@@ -48,7 +60,11 @@ interface Log {
 }
 
 const loading = ref(true)
+const loadingMore = ref(false)
 const logs = ref<Log[]>([])
+const page = ref(1)
+const lastPage = ref(1)
+const hasMore = computed(() => page.value < lastPage.value)
 
 const actionLabel = (a: string) =>
   ({ created: 'Criou', updated: 'Atualizou', deleted: 'Removeu' }[a] ?? a)
@@ -69,13 +85,30 @@ const formatTime = (iso: string) => {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+const loadPage = async (p: number) => {
+  const res = await fetch(`/api/audit?page=${p}`, { headers: { Accept: 'application/json' } })
+  if (res.ok) {
+    const json = await res.json()
+    const rows = (json.data ?? []) as Log[]
+    logs.value = p === 1 ? rows : [...logs.value, ...rows]
+    lastPage.value = json.meta?.last_page ?? p
+    page.value = p
+  }
+}
+
+const loadMore = async () => {
+  if (loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    await loadPage(page.value + 1)
+  } finally {
+    loadingMore.value = false
+  }
+}
+
 onMounted(async () => {
   try {
-    const res = await fetch('/api/audit', { headers: { Accept: 'application/json' } })
-    if (res.ok) {
-      const json = await res.json()
-      logs.value = json.data ?? []
-    }
+    await loadPage(1)
   } finally {
     loading.value = false
   }

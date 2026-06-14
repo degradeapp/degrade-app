@@ -78,11 +78,16 @@ Concluído (detalhe em `fable5/RELATORIO_SEGURANCA.md` e `RELATORIO_EFICIENCIA.m
       pré-carrega barbeiros+pivot uma vez). `EfficiencyTest` prova que não escala com o nº de itens.
 - [x] **E5:** auditoria paginada (`paginate`, `data` + `meta`, contrato preservado).
 - [x] **B4 (LGPD):** webhook do WhatsApp não loga mais o payload completo (telefone/texto do cliente).
+- [x] **B2:** webhooks (Asaas + WhatsApp) fecham a porta em produção sem secret (fail closed) em vez
+      de aceitar. **Bug de prod corrigido junto:** os webhooks estavam no grupo web sob CSRF e levariam
+      419 em produção (Asaas/Meta não mandam token); agora isentos de CSRF (autenticidade é o HMAC).
+- [x] **E8:** removido o listener morto `InvalidateAvailabilityCache` (dava `Cache::forget` numa chave
+      que NADA grava; não há cache de disponibilidade implementado).
 
-Ainda em aberto (menor prioridade / fase deploy): B2 (falhar hard se secret de webhook vazio em
-produção), B3 (convite permite 2º dono — confirmar se é intencional), E4 (janela de 60 dias da
-agenda — acoplado ao front), E6 (Commission.pendingSummary agrupa em PHP), E8 (listener de cache
-de disponibilidade morto). Detalhe nos relatórios.
+Ainda em aberto (decisão sua / acoplado ao front): **B3** (convite permite 2º dono — recomendação:
+deixar, é o caso de sócio; não mexi), **E4** (janela de 60 dias da agenda — acoplado ao front),
+**E6** (Commission.pendingSummary agrupa em PHP — dispensado: os `items` são eager-loaded, não há
+N+1, e o volume por mês é pequeno; mexer quebraria o contrato da tela). Detalhe nos relatórios.
 
 ## 🔌 Falta INTEGRAR (externo — congelado)
 - [ ] ⚠️ **WhatsApp Cloud API** — hoje dev/manual; produção precisa de Embedded Signup

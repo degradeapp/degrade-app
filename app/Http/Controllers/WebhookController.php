@@ -44,9 +44,16 @@ class WebhookController extends Controller
         $secret = config('services.asaas.webhook_secret');
 
         // Sem secret configurado (sandbox / local / testes): não há como verificar a
-        // assinatura — aceita. Em produção o secret estará definido e a verificação HMAC
-        // completa é aplicada. (Ver billing_critical_rules.)
+        // assinatura. B2: em PRODUÇÃO fecha a porta (fail closed) — sem secret, um POST
+        // forjado poderia "ativar" assinatura de graça, então rejeita. Fora de produção
+        // aceita. ASAAS_WEBHOOK_SECRET é obrigatório no deploy. (Ver billing_critical_rules.)
         if (! $secret) {
+            if (app()->environment('production')) {
+                Log::critical('ASAAS_WEBHOOK_SECRET ausente em produção: webhook rejeitado.');
+
+                return false;
+            }
+
             return true;
         }
 

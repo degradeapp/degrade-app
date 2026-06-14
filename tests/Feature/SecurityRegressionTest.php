@@ -100,6 +100,22 @@ it('mantem o comportamento de dev: sem app_secret o webhook aceita (paridade com
     $this->postJson('/webhooks/whatsapp', ['entry' => []])->assertOk();
 });
 
+// ---------- B2: webhooks fecham a porta em producao sem secret ----------
+
+it('rejeita webhook do whatsapp em producao quando o app_secret nao esta configurado', function () {
+    $this->app->detectEnvironment(fn () => 'production');
+    config(['services.whatsapp.app_secret' => null]);
+
+    $this->postJson('/webhooks/whatsapp', ['entry' => []])->assertStatus(401);
+});
+
+it('rejeita webhook do asaas em producao quando o webhook_secret nao esta configurado', function () {
+    $this->app->detectEnvironment(fn () => 'production');
+    config(['services.asaas.webhook_secret' => null]);
+
+    $this->postJson('/api/webhooks/asaas', ['event' => 'subscription.payment_received'])->assertStatus(401);
+});
+
 // ---------- A3: atalho do dono nunca cruza tenant ----------
 
 it('nao deixa o before do dono autorizar recurso de outro tenant', function () {

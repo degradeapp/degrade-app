@@ -25,6 +25,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'onboarding.completed' => \App\Http\Middleware\EnsureOnboardingCompleted::class,
             'onboarding.incomplete' => \App\Http\Middleware\EnsureOnboardingNotCompleted::class,
         ]);
+
+        // Webhooks externos (Asaas/Meta) chegam SEM token CSRF; estão no grupo web
+        // (logo, sob VerifyCsrfToken) e seriam rejeitados com 419 em produção. A
+        // autenticidade deles é garantida por assinatura HMAC nos próprios handlers.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/whatsapp',
+            'api/webhooks/asaas',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Sessão expirada/sem login em chamada de API (JSON): mensagem em pt-BR.

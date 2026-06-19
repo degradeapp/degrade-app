@@ -47,6 +47,30 @@
         />
       </div>
 
+      <div v-if="slug" class="space-y-2">
+        <p class="text-[13px] font-medium text-white">Link de agendamento</p>
+        <p class="text-[12px] text-[#6B6B6B] -mt-1">Seus clientes marcam sozinhos por aqui.</p>
+        <div class="flex items-center gap-2 bg-[#131313] border border-[#2A2A2A] rounded-[10px] p-2.5">
+          <span class="flex-1 min-w-0 truncate text-[13px] text-[#A1A1A1]">{{ bookingUrl }}</span>
+          <button
+            type="button"
+            @click="copyLink"
+            class="flex-shrink-0 h-9 px-3 rounded-[8px] bg-[#1A1A1A] border border-[#2A2A2A] text-[12px] font-medium text-white hover:border-[#FFD60A] transition-colors flex items-center gap-1.5 active:scale-[0.97]"
+          >
+            <component :is="copied ? Check : Copy" :size="14" :stroke-width="2" :class="copied ? 'text-[#22C55E]' : ''" />
+            {{ copied ? 'Copiado' : 'Copiar' }}
+          </button>
+        </div>
+        <a
+          :href="bookingUrl"
+          target="_blank"
+          rel="noopener"
+          class="inline-block text-[12px] font-medium text-[#FFD60A] hover:text-[#FFE066] transition-colors"
+        >
+          Abrir página de agendamento
+        </a>
+      </div>
+
       <div class="fixed bottom-0 left-0 right-0 bg-[#0A0A0A] border-t border-[#1F1F1F] p-4">
         <Button type="submit" variant="primary" class="w-full" :loading="isLoading" loading-text="Salvando...">
           Salvar configurações
@@ -58,6 +82,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+import { Copy, Check } from 'lucide-vue-next'
 import AppLayout from '../../layouts/AppLayout.vue'
 import FormField from '../../components/FormField.vue'
 import Button from '../../components/Button.vue'
@@ -69,6 +96,24 @@ import { BR_TIMEZONES } from '@/data/timezones'
 const toast = useToast()
 const isLoading = ref(false)
 const logoUrl = ref<string | null>(null)
+
+// Link público de agendamento: base = slug do tenant (vem dos props compartilhados).
+const slug = computed(() => (usePage().props as any).tenant?.slug as string | undefined)
+const bookingUrl = computed(() =>
+  slug.value && typeof window !== 'undefined' ? `${window.location.origin}/agendar/${slug.value}` : ''
+)
+const copied = ref(false)
+const copyLink = async () => {
+  if (!bookingUrl.value) return
+  try {
+    await navigator.clipboard.writeText(bookingUrl.value)
+    copied.value = true
+    toast.success('Link copiado')
+    setTimeout(() => (copied.value = false), 2000)
+  } catch {
+    toast.error('Não foi possível copiar. Copie o link manualmente.')
+  }
+}
 
 const form = reactive({
   name: '',

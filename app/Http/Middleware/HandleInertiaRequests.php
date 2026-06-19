@@ -35,6 +35,7 @@ class HandleInertiaRequests extends Middleware
             'tenant' => $tenant ? [
                 'id' => $tenant->id,
                 'name' => $tenant->name,
+                'slug' => $tenant->slug, // base do link público de agendamento (/agendar/{slug})
                 'logo_url' => $tenant->logoUrl(),
                 'status' => $tenant->status,
                 'plan' => $tenant->plan,

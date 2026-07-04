@@ -248,6 +248,30 @@ class WhatsappBotTest extends TestCase
         ]);
     }
 
+    /**
+     * Regressão do contrato comercial: o bot faz parte de TODOS os planos.
+     * Um tenant no Solo completa o fluxo inteiro de agendamento pelo bot;
+     * se alguém gatear o bot por plano, este teste quebra de propósito.
+     */
+    public function test_bot_works_on_solo_plan(): void
+    {
+        $this->tenant->update(['plan' => 'solo']);
+
+        $this->send('oi');
+        $this->send('1');
+        $this->send('3'); // qualquer barbeiro
+        $this->send('1');
+        $this->send('1');
+        $this->send('sim');
+
+        $this->assertSame(WhatsappBotState::done, $this->conversation()->state);
+        $this->assertStringContainsString('confirmado', $this->lastReply());
+        $this->assertDatabaseHas('appointments', [
+            'tenant_id' => $this->tenant->id,
+            'source' => 'whatsapp',
+        ]);
+    }
+
     public function test_cancelar_resets_from_any_state(): void
     {
         $this->send('oi');

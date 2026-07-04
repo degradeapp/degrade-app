@@ -141,6 +141,8 @@ const canCancel = computed(
 
 const info = ref<BillingInfo>({ status: 'trial', plan: null })
 
+// Os dois planos têm TUDO (bot de WhatsApp 24h incluso); o único diferencial
+// é o número de profissionais.
 const plans = [
   {
     id: 'solo',
@@ -151,9 +153,9 @@ const plans = [
     inherits: '',
     features: [
       '1 profissional',
-      'Agenda e agendamento online',
-      'Lembrete automático no WhatsApp',
-      'Comissões e controle de caixa',
+      'Agenda e link de agendamento online',
+      'Bot de WhatsApp 24h (cliente agenda sozinho)',
+      'Comissões e relatórios de faturamento',
       'Clientes com histórico de visitas',
     ],
   },
@@ -161,30 +163,15 @@ const plans = [
     id: 'barbearia',
     name: 'Barbearia',
     price: 119,
-    segment: 'Pra equipe de até 4',
+    segment: 'Pra equipe de até 10',
     featured: true,
     inherits: 'Tudo do Solo, e mais:',
     features: [
-      'Até 4 profissionais',
-      'Agenda e comissão por barbeiro',
-      'Bot de WhatsApp 24h (cliente agenda sozinho)',
-      'Relatórios de faturamento e ranking',
-      'Suporte prioritário no WhatsApp',
-    ],
-  },
-  {
-    id: 'rede',
-    name: 'Rede',
-    price: 219,
-    segment: 'Pra mais de uma unidade',
-    featured: false,
-    inherits: 'Tudo da Barbearia, e mais:',
-    features: [
       'Até 10 profissionais',
-      'Várias unidades num só painel',
-      'Relatório consolidado da rede',
-      'Acesso por função (gerente, recepção)',
-      'Onboarding e suporte dedicado',
+      'Agenda e comissão por barbeiro',
+      'Acesso da equipe por função (gerente, recepção)',
+      'Ranking de barbeiros nos relatórios',
+      'Suporte prioritário no WhatsApp',
     ],
   },
 ]

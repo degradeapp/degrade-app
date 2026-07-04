@@ -50,14 +50,6 @@
           @input="onCommissionInput"
         />
 
-        <!-- Unidade: mover o barbeiro entre unidades (só em rede com > 1). -->
-        <SelectField
-          v-if="showUnitField"
-          v-model="form.unit_id"
-          :options="unitOptions"
-          title="Unidade"
-        />
-
         <label class="flex items-center gap-3 bg-[#131313] border border-[#2A2A2A] rounded-[10px] p-4 cursor-pointer">
           <input
             v-model="form.is_active"
@@ -92,11 +84,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import AppLayout from '../../layouts/AppLayout.vue'
 import FormField from '../../components/FormField.vue'
-import SelectField from '../../components/SelectField.vue'
 import Button from '../../components/Button.vue'
 import Skeleton from '../../components/Skeleton.vue'
 import AvatarUpload from '../../components/AvatarUpload.vue'
@@ -107,11 +98,6 @@ const { formatPhone } = useFormatting()
 const { ask } = useConfirm()
 const page = usePage()
 const barberId = page.url.split('/').filter(Boolean)[1]
-
-// Unidades da rede; o seletor (mover de unidade) só aparece com > 1 unidade.
-const units = computed(() => (page.props as any).units ?? null)
-const showUnitField = computed(() => (units.value?.list?.length ?? 0) > 1)
-const unitOptions = computed(() => (units.value?.list ?? []).map((u: any) => ({ value: u.id, label: u.name })))
 
 const loading = ref(true)
 const isLoading = ref(false)
@@ -124,7 +110,6 @@ const form = reactive({
   phone: '',
   default_commission_percentage: 15,
   is_active: true,
-  unit_id: null as number | null,
 })
 
 const errors = reactive({
@@ -168,7 +153,6 @@ onMounted(async () => {
       form.phone = formatPhone(b.phone ?? '')
       form.default_commission_percentage = Number(b.default_commission_percentage ?? 15)
       form.is_active = !!b.is_active
-      form.unit_id = b.unit_id ?? null
       photoUrl.value = b.photo_url ?? null
     }
   } finally {

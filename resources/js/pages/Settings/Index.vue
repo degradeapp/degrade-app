@@ -62,7 +62,7 @@ import { computed } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AppLayout from '../../layouts/AppLayout.vue'
 import {
-  Building2, Clock, KeyRound, User, MessageCircle, CreditCard, Bell, History, BarChart3, ChevronRight, Tag, Wallet, Scissors, Store,
+  Building2, Clock, KeyRound, User, MessageCircle, CreditCard, Bell, History, BarChart3, ChevronRight, Tag, Wallet, Scissors,
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -79,13 +79,8 @@ const roleLabel = computed(() => (role.value ? roleLabels[role.value] ?? '' : ''
 // Só dono/gerente gerenciam a barbearia (o card vira link); recepção/barbeiro veem só informativo.
 const canManageBusiness = computed(() => role.value === 'owner' || role.value === 'manager')
 
-const planLabels: Record<string, string> = { solo: 'Solo', barbearia: 'Barbearia', rede: 'Rede' }
+const planLabels: Record<string, string> = { solo: 'Solo', barbearia: 'Barbearia' }
 const planLabel = computed(() => (plan.value ? planLabels[plan.value] ?? plan.value : 'Trial'))
-
-// "Unidades" só aparece pra quem é Rede (pode abrir várias) ou já tem mais de uma.
-const isRede = computed(() => plan.value === 'rede')
-const hasMultiUnits = computed(() => (page.props as any).units?.multiple === true)
-const canSeeUnits = computed(() => isRede.value || hasMultiUnits.value)
 
 const initials = computed(() =>
   tenantName.value.trim().split(/\s+/).map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()
@@ -98,7 +93,6 @@ interface Item {
   title: string
   description: string
   roles?: string[]
-  requiresRede?: boolean
 }
 
 const sections = [
@@ -112,7 +106,6 @@ const items: Item[] = [
   { section: 'gestao', href: '/services', icon: Tag, title: 'Serviços', description: 'Serviços que você oferece e seus preços', roles: ['owner', 'manager'] },
   { section: 'gestao', href: '/commissions', icon: Wallet, title: 'Comissões', description: 'Comissões dos barbeiros por atendimento', roles: ['owner', 'manager'] },
   { section: 'gestao', href: '/reports', icon: BarChart3, title: 'Relatórios', description: 'Receita, comissões e top atendimentos', roles: ['owner', 'manager'] },
-  { section: 'gestao', href: '/settings/units', icon: Store, title: 'Unidades', description: 'Locais da sua rede e endereços', roles: ['owner'], requiresRede: true },
   { section: 'ajustes', href: '/settings/team', icon: KeyRound, title: 'Acessos', description: 'Quem entra no sistema e suas permissões', roles: ['owner'] },
   { section: 'ajustes', href: '/settings/hours', icon: Clock, title: 'Horários', description: 'Horários padrão de funcionamento', roles: ['owner', 'manager'] },
   { section: 'ajustes', href: '/settings/business', icon: Building2, title: 'Barbearia', description: 'Nome, fuso horário, política de cancelamento', roles: ['owner', 'manager'] },
@@ -130,7 +123,6 @@ const groups = computed(() =>
       items: items.filter((i) =>
         i.section === s.section
         && (!i.roles || (role.value && i.roles.includes(role.value)))
-        && (!i.requiresRede || canSeeUnits.value)
       ),
     }))
     .filter((g) => g.items.length > 0)

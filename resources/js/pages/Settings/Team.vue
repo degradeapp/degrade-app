@@ -91,7 +91,6 @@
             </button>
           </div>
           <SelectField v-model="invite.role" :options="roleOptions" title="Papel do membro" />
-          <SelectField v-if="showUnitField" v-model="invite.unit_id" :options="unitOptions" title="Unidade" />
         </div>
 
         <p v-if="inviteError" class="text-[12px] text-[#EF4444]">{{ inviteError }}</p>
@@ -120,7 +119,6 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { usePage } from '@inertiajs/vue3'
 import { Plus } from 'lucide-vue-next'
 import AppLayout from '../../layouts/AppLayout.vue'
 import Skeleton from '../../components/Skeleton.vue'
@@ -130,15 +128,6 @@ import { useToast } from '../../composables/useToast'
 
 const { ask } = useConfirm()
 const toast = useToast()
-const page = usePage()
-
-// Unidades da rede: barbeiro/recepção entram numa unidade; o seletor aparece só com > 1.
-const units = computed(() => (page.props as any).units ?? null)
-const unitOptions = computed(() => (units.value?.list ?? []).map((u: any) => ({ value: u.id, label: u.name })))
-const defaultUnitId = () => units.value?.active_id ?? units.value?.list?.[0]?.id ?? null
-const showUnitField = computed(
-  () => (units.value?.list?.length ?? 0) > 1 && ['barber', 'receptionist'].includes(invite.role)
-)
 
 const roleOptions = [
   { value: 'manager', label: 'Gerente' },
@@ -161,10 +150,10 @@ const currentUserId = ref<number | null>(null)
 const inviteOpen = ref(false)
 const sending = ref(false)
 const inviteError = ref('')
-const invite = reactive({ name: '', email: '', password: '', role: 'receptionist', unit_id: null as number | null })
+const invite = reactive({ name: '', email: '', password: '', role: 'receptionist' })
 
 const openInvite = () => {
-  Object.assign(invite, { name: '', email: '', password: '', role: 'receptionist', unit_id: defaultUnitId() })
+  Object.assign(invite, { name: '', email: '', password: '', role: 'receptionist' })
   inviteError.value = ''
   inviteOpen.value = true
 }
@@ -227,7 +216,7 @@ const sendInvite = async () => {
     if (res.ok || res.status === 201) {
       const json = await res.json()
       team.value = [...team.value, json.data]
-      Object.assign(invite, { name: '', email: '', password: '', role: 'receptionist', unit_id: defaultUnitId() })
+      Object.assign(invite, { name: '', email: '', password: '', role: 'receptionist' })
       inviteOpen.value = false
       toast.success('Membro adicionado. Envie o e-mail e a senha pra ele entrar.', 5000)
     } else if (res.status === 401) {

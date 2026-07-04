@@ -4,15 +4,12 @@ import { Head } from '@inertiajs/vue3'
 import { ChevronLeft, Check, Loader2, Scissors, Store } from 'lucide-vue-next'
 import { useFormatting } from '@/composables/useFormatting'
 
-interface CatalogUnit { id: number; name: string; address: string | null }
 interface CatalogService { id: number; name: string; price: number }
-interface CatalogBarber { id: number; unit_id: number | null; name: string; photo_url: string | null }
+interface CatalogBarber { id: number; name: string; photo_url: string | null }
 interface Catalog {
   name: string
   logo_url: string | null
   timezone: string
-  multi_unit: boolean
-  units: CatalogUnit[]
   services: CatalogService[]
   barbers: CatalogBarber[]
 }
@@ -22,7 +19,6 @@ interface Confirmation {
   barber_name: string
   services: string[]
   total_price: number
-  unit_name: string
 }
 
 const props = defineProps<{ slug: string }>()
@@ -43,7 +39,6 @@ const catalog = ref<Catalog | null>(null)
 
 // ---- form ----
 const form = reactive({
-  unit_id: null as number | null,
   service_ids: [] as number[],
   barber_id: null as number | null, // null = "qualquer um"
   date: '',
@@ -53,17 +48,11 @@ const form = reactive({
 })
 const barberChosen = ref(false) // "qualquer" também é uma escolha válida (barber_id null)
 
-// ---- passos (unidade só aparece em rede) ----
-const steps = computed<string[]>(() => {
-  const s: string[] = []
-  if (catalog.value?.multi_unit) s.push('unit')
-  s.push('services', 'barber', 'datetime', 'contact')
-  return s
-})
+// ---- passos ----
+const steps = ['services', 'barber', 'datetime', 'contact']
 const stepIndex = ref(0)
-const stepKey = computed(() => steps.value[stepIndex.value] ?? 'services')
+const stepKey = computed(() => steps[stepIndex.value] ?? 'services')
 const STEP_LABEL: Record<string, string> = {
-  unit: 'Escolha a unidade',
   services: 'O que você quer fazer?',
   barber: 'Com quem?',
   datetime: 'Quando?',
@@ -73,22 +62,15 @@ const STEP_LABEL: Record<string, string> = {
 const tz = computed(() => catalog.value?.timezone || 'America/Manaus')
 
 // ---- derivados ----
-const barbersForUnit = computed(() => {
-  if (!catalog.value) return []
-  if (!catalog.value.multi_unit) return catalog.value.barbers
-  return catalog.value.barbers.filter((b) => b.unit_id === form.unit_id)
-})
+const barbers = computed(() => catalog.value?.barbers ?? [])
 const selectedServices = computed(() =>
   (catalog.value?.services ?? []).filter((s) => form.service_ids.includes(s.id))
 )
 const totalPrice = computed(() => selectedServices.value.reduce((sum, s) => sum + s.price, 0))
 const selectedBarberName = computed(() => {
   if (form.barber_id === null) return 'Qualquer profissional'
-  return barbersForUnit.value.find((b) => b.id === form.barber_id)?.name ?? ''
+  return barbers.value.find((b) => b.id === form.barber_id)?.name ?? ''
 })
-const selectedUnitName = computed(
-  () => catalog.value?.units.find((u) => u.id === form.unit_id)?.name ?? ''
-)
 
 const initials = (name: string) =>
   name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()
@@ -129,14 +111,14 @@ const slots = ref<string[]>([])
 const loadingSlots = ref(false)
 
 const loadSlots = async () => {
-  if (!form.date || !form.unit_id) {
+  if (!form.date) {
     slots.value = []
     return
   }
   loadingSlots.value = true
   slots.value = []
   try {
-    const params = new URLSearchParams({ date: form.date, unit_id: String(form.unit_id) })
+    const params = new URLSearchParams({ date: form.date })
     if (form.barber_id !== null) params.set('barber_id', String(form.barber_id))
     const res = await fetch(
       `/api/public/agendar/${encodeURIComponent(props.slug)}/horarios?${params.toString()}`,
@@ -166,7 +148,6 @@ watch(() => form.date, () => {
 // ---- navegação ----
 const canAdvance = computed(() => {
   switch (stepKey.value) {
-    case 'unit': return form.unit_id !== null
     case 'services': return form.service_ids.length >= 1
     case 'barber': return barberChosen.value
     case 'datetime': return !!form.date && !!form.time
@@ -178,19 +159,9 @@ const back = () => {
   if (stepIndex.value > 0) stepIndex.value--
 }
 const next = () => {
-  if (stepIndex.value < steps.value.length - 1) stepIndex.value++
+  if (stepIndex.value < steps.length - 1) stepIndex.value++
 }
 
-const pickUnit = (id: number) => {
-  if (form.unit_id !== id) {
-    form.unit_id = id
-    // trocar de unidade invalida barbeiro/horário escolhidos
-    form.barber_id = null
-    barberChosen.value = false
-    form.time = ''
-  }
-  next()
-}
 const toggleService = (id: number) => {
   const i = form.service_ids.indexOf(id)
   if (i >= 0) form.service_ids.splice(i, 1)
@@ -239,7 +210,6 @@ const submit = async () => {
         phone: parsePhone(form.phone),
         service_ids: form.service_ids,
         barber_id: form.barber_id,
-        unit_id: form.unit_id,
         starts_at: `${form.date}T${form.time}:00`,
       }),
     })
@@ -269,7 +239,7 @@ const submit = async () => {
       // de horário e recarrega a lista (o servidor é a autoridade).
       submitError.value = body?.message || 'Este horário não está mais disponível. Escolha outro.'
       form.time = ''
-      const dtIndex = steps.value.indexOf('datetime')
+      const dtIndex = steps.indexOf('datetime')
       if (dtIndex >= 0) stepIndex.value = dtIndex
       loadSlots()
       return
@@ -311,9 +281,6 @@ const loadCatalog = async () => {
     }
     const json = await res.json()
     catalog.value = json.data as Catalog
-    if (!catalog.value.multi_unit && catalog.value.units.length > 0) {
-      form.unit_id = catalog.value.units[0].id
-    }
   } catch {
     loadError.value = true
   } finally {
@@ -388,27 +355,8 @@ onMounted(loadCatalog)
 
       <!-- CONTEÚDO -->
       <main class="flex-1 overflow-y-auto pb-24 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <!-- UNIDADE -->
-        <section v-if="stepKey === 'unit'" class="px-4 py-4 space-y-2 animate-enter">
-          <button
-            v-for="u in catalog.units"
-            :key="u.id"
-            @click="pickUnit(u.id)"
-            class="w-full flex items-center gap-3 rounded-[14px] p-4 border text-left transition-colors active:scale-[0.99]"
-            :class="form.unit_id === u.id ? 'border-[#FFD60A] bg-[#FFD60A]/[0.04]' : 'border-[#2A2A2A] bg-[#131313] hover:border-[#3D3D3D]'"
-          >
-            <div class="w-10 h-10 rounded-full bg-[#1A1A1A] flex items-center justify-center flex-shrink-0">
-              <Store :size="18" class="text-[#FFD60A]" :stroke-width="1.75" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-[14px] font-medium text-white truncate">{{ u.name }}</p>
-              <p v-if="u.address" class="text-[12px] text-[#A1A1A1] truncate mt-0.5">{{ u.address }}</p>
-            </div>
-          </button>
-        </section>
-
         <!-- SERVIÇOS -->
-        <section v-else-if="stepKey === 'services'" class="px-4 py-4 space-y-2 animate-enter">
+        <section v-if="stepKey === 'services'" class="px-4 py-4 space-y-2 animate-enter">
           <div v-if="catalog.services.length === 0" class="text-center py-12">
             <p class="text-[14px] font-medium text-white mb-1">Nenhum serviço disponível</p>
             <p class="text-[13px] text-[#A1A1A1]">Entre em contato com a barbearia.</p>
@@ -450,7 +398,7 @@ onMounted(loadCatalog)
           </button>
 
           <button
-            v-for="b in barbersForUnit"
+            v-for="b in barbers"
             :key="b.id"
             @click="pickBarber(b.id)"
             class="w-full flex items-center gap-3 rounded-[14px] p-4 border text-left transition-colors active:scale-[0.99]"
@@ -468,8 +416,8 @@ onMounted(loadCatalog)
             <p class="flex-1 text-[14px] font-medium text-white">{{ b.name }}</p>
           </button>
 
-          <div v-if="barbersForUnit.length === 0" class="text-center py-10">
-            <p class="text-[14px] font-medium text-white mb-1">Nenhum profissional nesta unidade</p>
+          <div v-if="barbers.length === 0" class="text-center py-10">
+            <p class="text-[14px] font-medium text-white mb-1">Nenhum profissional disponível</p>
             <p class="text-[13px] text-[#A1A1A1]">Use "Qualquer profissional" acima.</p>
           </div>
         </section>
@@ -516,10 +464,6 @@ onMounted(loadCatalog)
         <!-- CONTATO + RESUMO -->
         <section v-else-if="stepKey === 'contact'" class="px-4 py-4 space-y-3 animate-enter">
           <div class="bg-[#131313] border border-[#2A2A2A] rounded-[14px] p-4 space-y-2">
-            <div v-if="catalog.multi_unit" class="flex items-center justify-between">
-              <span class="text-[12px] text-[#6B6B6B]">Unidade</span>
-              <span class="text-[13px] font-medium text-white">{{ selectedUnitName }}</span>
-            </div>
             <div class="flex items-center justify-between">
               <span class="text-[12px] text-[#6B6B6B]">Profissional</span>
               <span class="text-[13px] font-medium text-white">{{ selectedBarberName }}</span>
@@ -611,7 +555,6 @@ onMounted(loadCatalog)
           {{ confirmation.services.join(', ') }} com {{ confirmation.barber_name }}
         </p>
         <p class="text-[15px] font-medium text-white mt-1">{{ confirmationDate }}</p>
-        <p v-if="catalog?.multi_unit" class="text-[13px] text-[#A1A1A1] mt-1">{{ confirmation.unit_name }}</p>
         <p class="text-[13px] text-[#6B6B6B] mt-6 max-w-[300px] leading-relaxed">
           Guarde a data. Em caso de imprevisto, fale com a barbearia.
         </p>

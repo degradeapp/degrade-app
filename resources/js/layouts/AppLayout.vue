@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
-import { ChevronLeft, CalendarPlus, UserPlus, Scissors, Tag, Search, MapPin, ChevronDown, Check } from 'lucide-vue-next'
+import { ChevronLeft, CalendarPlus, UserPlus, Scissors, Tag, Search } from 'lucide-vue-next'
 import BottomNav from '../components/BottomNav.vue'
 import Toast from '../components/Toast.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -25,36 +25,6 @@ const showCreateMenu = ref(false)
 
 const page = usePage()
 const role = computed(() => (page.props as any).auth?.user?.role ?? null)
-
-// Seletor de unidade (dono/gerente com mais de uma unidade). Barbeiro/recepção ficam
-// presos na sua (can_switch=false) e não veem o seletor.
-const units = computed(() => (page.props as any).units ?? null)
-const showUnitSwitcher = computed(() => !props.showBackButton && !!units.value?.can_switch && !!units.value?.multiple)
-const activeUnitName = computed(() => {
-  const u = units.value
-  if (!u) return ''
-  if (u.active_id == null) return 'Todas as unidades'
-  return (u.list ?? []).find((x: any) => x.id === u.active_id)?.name ?? 'Unidade'
-})
-const showUnitMenu = ref(false)
-
-const xsrf = () => decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '')
-
-const switchUnit = async (unitId: number | 'all') => {
-  showUnitMenu.value = false
-  await fetch('/api/units/switch', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-XSRF-TOKEN': xsrf(),
-    },
-    body: JSON.stringify({ unit_id: unitId }),
-  })
-  router.reload() // re-resolve a unidade ativa e re-renderiza a página escopada
-}
 
 // Sincronização entre abas: o navegador tem UMA sessão só. Se outra aba logar com
 // outro usuário, esta aba se re-sincroniza (recarrega) em vez de ficar mostrando uma
@@ -136,18 +106,6 @@ const goBack = () => {
       <slot name="header-right"></slot>
     </header>
 
-    <!-- Seletor de unidade (rede com várias unidades; dono/gerente) -->
-    <button
-      v-if="showUnitSwitcher"
-      type="button"
-      @click="showUnitMenu = true"
-      class="w-full flex items-center justify-center gap-1.5 py-2 bg-[#131313] border-b border-[#2A2A2A] text-[13px] font-medium text-[#A1A1A1] hover:text-white transition-colors flex-shrink-0"
-    >
-      <MapPin :size="14" :stroke-width="2" class="text-[#FFD60A]" />
-      {{ activeUnitName }}
-      <ChevronDown :size="14" :stroke-width="2" />
-    </button>
-
     <!-- Main content -->
     <main class="flex-1 overflow-y-auto pb-20">
       <slot />
@@ -179,44 +137,6 @@ const goBack = () => {
                   <component :is="action.icon" :size="20" class="text-[#FFD60A]" :stroke-width="1.75" />
                 </div>
                 <span class="text-[15px] font-medium text-white">{{ action.label }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
-    <!-- Seletor de unidade (bottom sheet) -->
-    <Teleport to="body">
-      <transition name="fade-menu">
-        <div
-          v-if="showUnitMenu"
-          class="fixed inset-0 bg-black/50 z-50 flex items-end"
-          @click.self="showUnitMenu = false"
-        >
-          <div class="w-full bg-[#131313] border-t border-[#2A2A2A] rounded-t-[20px] p-4 pb-8 animate-in slide-in-from-bottom duration-300">
-            <div class="w-10 h-1 bg-[#3D3D3D] rounded-full mx-auto mb-5"></div>
-            <h3 class="text-[16px] font-semibold text-white mb-4 px-1">Trocar de unidade</h3>
-            <div class="space-y-1">
-              <button
-                type="button"
-                @click="switchUnit('all')"
-                class="w-full flex items-center justify-between h-12 px-3 rounded-[12px] text-left hover:bg-[#1A1A1A] transition-colors"
-                :class="units?.active_id == null ? 'text-[#FFD60A]' : 'text-white'"
-              >
-                <span class="text-[15px] font-medium">Todas as unidades</span>
-                <Check v-if="units?.active_id == null" :size="18" :stroke-width="2.25" />
-              </button>
-              <button
-                v-for="u in (units?.list ?? [])"
-                :key="u.id"
-                type="button"
-                @click="switchUnit(u.id)"
-                class="w-full flex items-center justify-between h-12 px-3 rounded-[12px] text-left hover:bg-[#1A1A1A] transition-colors"
-                :class="units?.active_id === u.id ? 'text-[#FFD60A]' : 'text-white'"
-              >
-                <span class="text-[15px] font-medium">{{ u.name }}</span>
-                <Check v-if="units?.active_id === u.id" :size="18" :stroke-width="2.25" />
               </button>
             </div>
           </div>

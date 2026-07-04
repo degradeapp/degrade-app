@@ -118,27 +118,6 @@
             </div>
           </section>
 
-          <!-- Por unidade (consolidado da rede) — só quando há mais de uma -->
-          <section v-if="(data.per_unit?.length ?? 0) > 1" class="space-y-2">
-            <h3 class="flex items-center gap-1.5 text-[12px] font-semibold text-white px-1">
-              <Store :size="14" :stroke-width="2" class="text-[#A1A1A1]" />
-              Por unidade
-            </h3>
-            <div class="space-y-2">
-              <div
-                v-for="u in data.per_unit"
-                :key="u.unit_id"
-                class="bg-[#131313] border border-[#2A2A2A] rounded-[12px] p-3 flex items-center gap-3"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-[14px] font-medium text-white truncate">{{ u.name }}</p>
-                  <p class="text-[11px] text-[#A1A1A1] tabular-nums">{{ u.count }} {{ u.count === 1 ? 'atendimento' : 'atendimentos' }}</p>
-                </div>
-                <p class="text-[14px] font-bold text-[#FFD60A] tabular-nums flex-shrink-0">{{ fmt(u.revenue) }}</p>
-              </div>
-            </div>
-          </section>
-
           <!-- Atendimentos -->
           <section class="space-y-2">
             <h3 class="flex items-center gap-1.5 text-[12px] font-semibold text-white px-1">
@@ -236,7 +215,7 @@
 import { ref, computed, onMounted } from 'vue'
 import {
   TrendingUp, Wallet, PiggyBank, CalendarCheck, CalendarOff,
-  CalendarRange, UserPlus, Scissors, Users, Store,
+  CalendarRange, UserPlus, Scissors, Users,
 } from 'lucide-vue-next'
 import AppLayout from '../../layouts/AppLayout.vue'
 import Skeleton from '../../components/Skeleton.vue'
@@ -258,7 +237,6 @@ interface ReportData {
   commissions_pending: number
   commissions_paid: number
   net_revenue: number
-  per_unit: Array<{ unit_id: number; name: string; count: number; revenue: number }>
   top_barbers: Array<{ barber_id: number; name: string; count: number; revenue: number }>
   top_customers: Array<{ customer_id: number; name: string; count: number; revenue: number }>
 }

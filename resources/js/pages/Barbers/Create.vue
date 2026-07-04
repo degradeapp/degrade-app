@@ -31,13 +31,6 @@
           @input="onCommissionInput"
         />
 
-        <!-- Unidade: só aparece em rede com mais de uma unidade. -->
-        <SelectField
-          v-if="showUnitField"
-          v-model="form.unit_id"
-          :options="unitOptions"
-          title="Unidade"
-        />
       </div>
 
       <!-- Submit button -->
@@ -57,31 +50,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+import { ref, reactive } from 'vue'
+import { router } from '@inertiajs/vue3'
 import AppLayout from '../../layouts/AppLayout.vue'
 import FormField from '../../components/FormField.vue'
-import SelectField from '../../components/SelectField.vue'
 import Button from '../../components/Button.vue'
 import { useApi } from '../../composables/useApi'
 import { useToast } from '../../composables/useToast'
 
 const api = useApi()
 const toast = useToast()
-const page = usePage()
-
-// Unidades da rede (vêm compartilhadas via Inertia). Só mostra o seletor se houver > 1.
-const units = computed(() => (page.props as any).units ?? null)
-const showUnitField = computed(() => (units.value?.list?.length ?? 0) > 1)
-const unitOptions = computed(() => (units.value?.list ?? []).map((u: any) => ({ value: u.id, label: u.name })))
 
 const isLoading = ref(false)
 const form = reactive({
   name: '',
   phone: '',
   default_commission_percentage: null as number | null,
-  // Pré-seleciona a unidade ativa (ou a 1ª); o barbeiro nasce nessa unidade.
-  unit_id: (units.value?.active_id ?? units.value?.list?.[0]?.id ?? null) as number | null,
 })
 
 const errors = reactive({

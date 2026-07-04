@@ -32,9 +32,19 @@
       </div>
 
       <div v-else class="space-y-2 stagger">
-        <p class="text-[12px] text-[#6B6B6B] px-1 tabular-nums">
-          {{ customers.length }} {{ customers.length === 1 ? 'cliente' : 'clientes' }}
-        </p>
+        <div class="flex items-center justify-between px-1">
+          <p class="text-[12px] text-[#6B6B6B] tabular-nums">
+            {{ customers.length }} {{ customers.length === 1 ? 'cliente' : 'clientes' }}
+          </p>
+          <a
+            v-if="isOwner"
+            href="/api/customers/export"
+            class="flex items-center gap-1.5 h-9 px-3 -mr-1 rounded-[8px] text-[12px] font-medium text-[#A1A1A1] hover:text-white transition-colors"
+          >
+            <Download :size="14" :stroke-width="2" />
+            Exportar CSV
+          </a>
+        </div>
         <Link
           v-for="customer in customers"
           :key="customer.id"
@@ -60,9 +70,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Link, router } from '@inertiajs/vue3'
-import { Users, Search, ChevronRight } from 'lucide-vue-next'
+import { ref, computed, onMounted } from 'vue'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import { Users, Search, ChevronRight, Download } from 'lucide-vue-next'
 import AppLayout from '../../layouts/AppLayout.vue'
 import Skeleton from '../../components/Skeleton.vue'
 import { useFormatting } from '../../composables/useFormatting'
@@ -70,6 +80,10 @@ import { useApi } from '../../composables/useApi'
 
 const { formatBRL, formatPhone } = useFormatting()
 const api = useApi()
+const page = usePage()
+
+// Exportar a base é decisão de conta: só o dono (a rota também exige owner).
+const isOwner = computed(() => (page.props as any).auth?.user?.role === 'owner')
 
 interface Customer {
   id: number

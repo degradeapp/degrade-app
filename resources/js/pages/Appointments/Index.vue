@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+import { Link, router, usePage } from '@inertiajs/vue3'
 import { useFormatting } from '@/composables/useFormatting'
 import AppLayout from '@/layouts/AppLayout.vue'
 import { ChevronLeft, ChevronRight, CalendarOff, FileText } from 'lucide-vue-next'
@@ -669,6 +669,13 @@ onUnmounted(() => { if (nowTimer) clearInterval(nowTimer) })
       <p class="text-[13px] text-[#A1A1A1] text-center">
         {{ emptySubtitle }}
       </p>
+      <Link
+        v-if="selectedStatus === 'all' && !isPastDay"
+        href="/appointments/create"
+        class="inline-block mt-4 h-11 px-5 leading-[2.75rem] rounded-[10px] bg-[#FFD60A] text-[14px] font-bold text-[#0A0A0A] hover:bg-[#FFE066]"
+      >
+        + Novo agendamento
+      </Link>
     </div>
 
     <!-- BOTTOM SHEET DE CONFLITOS -->

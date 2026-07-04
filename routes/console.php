@@ -17,3 +17,6 @@ Schedule::job(new SendAppointmentReminders('1h'))->everyFifteenMinutes();
 
 // Purga das contas excluídas cuja janela de recuperação (30 dias) expirou — todo dia às 3h
 Schedule::command('accounts:purge')->dailyAt('03:00');
+
+// Backup diário do banco (local; envio externo congelado) — todo dia às 3h30
+Schedule::command('db:backup')->dailyAt('03:30');

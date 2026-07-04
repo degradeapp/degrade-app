@@ -33,7 +33,6 @@
           type="number"
           label="Janela de cancelamento (horas)"
           placeholder=" "
-          hint="Quantas horas antes o cliente pode cancelar"
           :error="errors.cancellation_policy_hours"
         />
 
@@ -42,7 +41,6 @@
           type="number"
           label="Comissão padrão (%)"
           placeholder=" "
-          hint="Usada quando serviço/barbeiro não tiver comissão própria"
           :error="errors.default_commission_percentage"
         />
       </div>

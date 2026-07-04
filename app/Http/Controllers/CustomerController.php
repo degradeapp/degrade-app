@@ -9,9 +9,11 @@ use App\Modules\Customer\Actions\CreateCustomer;
 use App\Modules\Customer\Actions\DeleteCustomer;
 use App\Modules\Customer\Actions\UpdateCustomer;
 use App\Modules\Customer\Models\Customer;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerController extends Controller
 {
@@ -32,6 +34,44 @@ class CustomerController extends Controller
         $customers = $query->orderBy('name')->paginate(request('per_page', 50));
 
         return CustomerResource::collection($customers);
+    }
+
+    /**
+     * Exporta a base de clientes em CSV (a base é do dono, sem lock-in).
+     * Owner-only na rota; exportação de dado pessoal fica na auditoria (LGPD).
+     * CSV com ; e BOM UTF-8 pro Excel pt-BR abrir com acento certo.
+     */
+    public function export(): StreamedResponse
+    {
+        $tenantId = app('tenant')->id;
+
+        ActivityLogger::log(
+            $tenantId,
+            'exported',
+            Customer::class,
+            0,
+            metadata: ['total' => Customer::count()],
+        );
+
+        return response()->streamDownload(function () {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Nome', 'Telefone', 'Email', 'Observações', 'Cadastrado em'], ';');
+
+            Customer::orderBy('name')->chunk(500, function ($customers) use ($out) {
+                foreach ($customers as $c) {
+                    fputcsv($out, [
+                        $c->name,
+                        $c->phone,
+                        $c->email,
+                        $c->notes,
+                        $c->created_at?->format('d/m/Y'),
+                    ], ';');
+                }
+            });
+
+            fclose($out);
+        }, 'clientes.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function store(StoreCustomerRequest $request, CreateCustomer $action): JsonResponse

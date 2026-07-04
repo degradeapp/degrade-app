@@ -254,7 +254,7 @@ const selectPlan = async (planId: string) => {
 const cancelPlan = async () => {
   const ok = await ask(
     'Cancelar assinatura?',
-    'Sua assinatura é encerrada e o acesso às telas pagas fica bloqueado. Seus dados continuam guardados — você pode assinar de novo quando quiser.',
+    'Sua assinatura é encerrada e o acesso às telas pagas fica bloqueado. Seus dados continuam guardados e você pode assinar de novo quando quiser.',
     { confirmText: 'Cancelar assinatura', destructive: true }
   )
   if (!ok) return

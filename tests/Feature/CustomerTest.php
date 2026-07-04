@@ -383,4 +383,42 @@ class CustomerTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['phone']);
     }
+    public function test_owner_can_export_customers_csv(): void
+    {
+        Customer::create(['tenant_id' => $this->tenant->id, 'name' => 'Zé Acentuação', 'phone' => '92991110000']);
+
+        // Cliente de OUTRO tenant nunca pode vazar no CSV
+        $other = Tenant::create(['name' => 'Outra', 'slug' => 'outra', 'status' => 'active']);
+        Customer::withoutGlobalScopes()->create(['tenant_id' => $other->id, 'name' => 'Intruso', 'phone' => '92990009999']);
+
+        $this->actingAs($this->owner);
+
+        $response = $this->get('/api/customers/export');
+
+        $response->assertOk();
+        $this->assertStringContainsString('text/csv', (string) $response->headers->get('Content-Type'));
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('Nome;Telefone;Email', $csv);
+        $this->assertStringContainsString('Zé Acentuação', $csv);
+        $this->assertStringNotContainsString('Intruso', $csv);
+
+        // Exportação de dado pessoal fica na trilha de auditoria (LGPD)
+        $this->assertDatabaseHas('activity_log', [
+            'tenant_id' => $this->tenant->id,
+            'user_id' => $this->owner->id,
+            'action' => 'exported',
+        ]);
+    }
+
+    public function test_non_owner_cannot_export_customers_csv(): void
+    {
+        // API: 403 direto. Web (clique no link): redireciona pra página /403.
+        $this->actingAs($this->receptionist);
+        $this->getJson('/api/customers/export')->assertStatus(403);
+        $this->get('/api/customers/export')->assertRedirect('/403');
+
+        $this->actingAs($this->manager);
+        $this->getJson('/api/customers/export')->assertStatus(403);
+    }
 }

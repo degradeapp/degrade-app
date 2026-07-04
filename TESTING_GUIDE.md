@@ -1,8 +1,19 @@
 # 🧪 Degradê — Guia de Validação & Roadmap
 
-> Atualizado: **13/06/2026**. Suíte: **325 testes verdes**. Roda 100% local sem custo
+> Atualizado: **03/07/2026**. Suíte: **320 testes verdes**. Roda 100% local sem custo
 > (SQLite, MAIL=log, Asaas sandbox). Integrações externas (WhatsApp/Email/Asaas live)
 > estão **congeladas** por decisão do dono.
+> **Multiunidade/plano Rede foi REMOVIDO** (03/07): um tenant = uma barbearia = um local.
+> Planos finais: **Solo (R$ 59, 1 profissional)** e **Barbearia (R$ 119, até 10)**;
+> bot de WhatsApp 24h em AMBOS — o único diferencial é o nº de profissionais.
+
+## 🧰 Ferramentas de venda/operação (novas)
+- `php artisan demo:seed` — cria o tenant de demonstração **demo-degrade**
+  (login `demo@degrade.test` / `demo1234`): equipe, serviços, clientes, semana
+  concluída com comissões e agenda viva. Pra mostrar o produto numa visita.
+- **Exportar CSV de clientes** — botão na tela Clientes (só dono); fica na auditoria.
+- `php artisan db:backup` — backup local diário (03h30 no scheduler) em
+  `storage/app/backups`, retém 7. Envio externo (R2/S3) segue congelado.
 
 ## ▶️ Como subir
 ```bash
@@ -49,19 +60,16 @@ npm run dev              # Vite com hot-reload (mudança aparece na hora)
 - [ ] **Histórico** (auditoria em pt-BR detalhado)
 - [ ] **Horários** da barbearia · **Barbearia** (nome, fuso, cancelamento)
 
-## 🏢 Plano Rede — multiunidade (CONSTRUÍDO, falta VOCÊ validar)
-- [x] **Construído** (289 testes verdes): várias unidades dentro do tenant, agenda/equipe por unidade,
-      clientes/serviços compartilhados, seletor de unidade no topo, isolação por papel, relatório
-      consolidado + por unidade. Gated no plano Rede.
-- [ ] **Validar:** assine/coloque o tenant no plano **Rede**, crie uma 2ª unidade (Configurações →
-      Unidades), troque de unidade no seletor do topo (agenda/dashboard mudam), cadastre barbeiro numa
-      unidade, e veja o relatório consolidado (seção "Por unidade"). Confirme que barbeiro de uma
-      unidade não vê a agenda da outra.
+## 🏢 Multiunidade — REMOVIDO (03/07/2026)
+- O plano Rede e toda a camada de unidades foram removidos por decisão do dono
+  (código, telas, rotas, tabela `units` e colunas `unit_id` dropadas por migração).
+  Tenants que estavam em `rede` viraram `barbearia` por migração de dados.
+  A isolação por TENANT permanece intocada (`TenancyIsolationTest`).
 
 ## ⚠️ Falta CONSTRUIR (antes de cobrar o plano cheio)
 - [x] **Link público de agendamento — BACKEND + FRONTEND**: API `/api/public/agendar/{slug}`
       (escopada por slug, isolada por tenant, rate-limited, não encaixa, `source=customer`) +
-      a tela Vue pública `/agendar/{slug}` (`PublicBooking/Index.vue`): wizard unidade→serviços→
+      a tela Vue pública `/agendar/{slug}` (`PublicBooking/Index.vue`): wizard serviços→
       profissional→data/hora→contato, dias e horários no fuso da loja, trata 404/422/429. Sem login.
       **Falta VOCÊ validar** no navegador (abrir `/agendar/<slug-da-loja>` e marcar de ponta a ponta).
 - [x] **402 (assinatura inativa) no front**: `useApi` redireciona pra `/billing` (espelha o 401→login).
@@ -73,7 +81,7 @@ escopa `exists` por tenant nos requests de agendamento (IDOR de escrita), assina
 `X-Hub-Signature-256` no webhook do WhatsApp, e `BasePolicy::before` do dono não cruza tenant.
 Concluído (detalhe em `fable5/RELATORIO_SEGURANCA.md` e `RELATORIO_EFICIENCIA.md`):
 - [x] **B1 (segurança):** `subscription.active` (JSON 402) nas rotas `/api/*` operacionais
-      (appointments, customers, barbers, services, commissions, reports, units, whatsapp inbox,
+      (appointments, customers, barbers, services, commissions, reports, whatsapp inbox,
       search). Conta/billing/auth/`/switch`/credenciais ficam abertos pra regularizar. `SubscriptionGateTest`.
 - [x] **`exists:` escopado por tenant** em `StoreBarberRequest.user_id` (varredura concluída; era o último).
 - [x] **E1:** `SearchService` filtra no banco em Postgres (unaccent ILIKE + GIN/pg_trgm via migration;

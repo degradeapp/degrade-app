@@ -32,7 +32,6 @@ class PublicBookingRequest extends FormRequest
             'service_ids' => 'required|array|min:1|max:5',
             'service_ids.*' => 'required|integer',
             'barber_id' => 'nullable|integer',
-            'unit_id' => 'nullable|integer',
             // O "passado" e o horizonte máximo são re-checados no controller
             // com o fuso DO TENANT já aplicado (o request roda antes do contexto).
             'starts_at' => 'required|date_format:Y-m-d\TH:i:s',

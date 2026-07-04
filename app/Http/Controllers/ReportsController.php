@@ -30,16 +30,9 @@ class ReportsController extends Controller
         $from = $request->input('from') ? Carbon::parse($request->input('from'))->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
         $to = $request->input('to') ? Carbon::parse($request->input('to'))->endOfDay() : Carbon::now()->endOfDay();
 
-        // Unidade ativa: null = consolidado (todas). Quando uma está selecionada, o relatório
-        // inteiro (receita, comissões, rankings) escopa nela. Clientes seguem da rede (CRM).
-        $unitId = app(\App\Modules\Tenant\Services\UnitContext::class)->scopedUnitId();
-        $byUnit = fn ($q) => $q->when($unitId !== null, fn ($qq) => $qq->where('unit_id', $unitId));
-        $byUnitVia = fn ($q) => $q->when($unitId !== null, fn ($qq) => $qq->whereHas('appointment', fn ($a) => $a->where('unit_id', $unitId)));
-
         $completedQuery = Appointment::where('tenant_id', $tenantId)
             ->where('status', AppointmentStatus::completed->value)
-            ->whereBetween('starts_at', [$from, $to])
-            ->tap($byUnit);
+            ->whereBetween('starts_at', [$from, $to]);
 
         $revenue = (float) (clone $completedQuery)->sum('total_price');
         $completedCount = (clone $completedQuery)->count();
@@ -47,13 +40,11 @@ class ReportsController extends Controller
         $cancelledCount = Appointment::where('tenant_id', $tenantId)
             ->where('status', AppointmentStatus::cancelled->value)
             ->whereBetween('starts_at', [$from, $to])
-            ->tap($byUnit)
             ->count();
 
         $noShowCount = Appointment::where('tenant_id', $tenantId)
             ->where('status', AppointmentStatus::no_show->value)
             ->whereBetween('starts_at', [$from, $to])
-            ->tap($byUnit)
             ->count();
 
         $newCustomers = Customer::where('tenant_id', $tenantId)
@@ -66,36 +57,16 @@ class ReportsController extends Controller
         $commissionsPending = (float) Commission::where('tenant_id', $tenantId)
             ->where('status', 'pending')
             ->whereBetween('reference_date', [$from, $to])
-            ->tap($byUnitVia)
             ->sum('amount');
 
         $commissionsPaid = (float) Commission::where('tenant_id', $tenantId)
             ->where('status', 'paid')
             ->whereBetween('reference_date', [$from, $to])
-            ->tap($byUnitVia)
             ->sum('amount');
-
-        // Quebra POR UNIDADE (o "consolidado" da rede): receita e atendimentos de cada uma.
-        $perUnit = Appointment::where('tenant_id', $tenantId)
-            ->where('status', AppointmentStatus::completed->value)
-            ->whereBetween('starts_at', [$from, $to])
-            ->tap($byUnit)
-            ->selectRaw('unit_id, COUNT(*) as count, SUM(total_price) as revenue')
-            ->groupBy('unit_id')
-            ->orderByDesc('revenue')
-            ->with(['unit' => fn ($q) => $q->withTrashed()->select('id', 'name')])
-            ->get()
-            ->map(fn ($row) => [
-                'unit_id' => $row->unit_id,
-                'name' => $row->unit?->name ?? '—',
-                'count' => (int) $row->count,
-                'revenue' => (float) $row->revenue,
-            ]);
 
         $topBarbers = Appointment::where('tenant_id', $tenantId)
             ->where('status', AppointmentStatus::completed->value)
             ->whereBetween('starts_at', [$from, $to])
-            ->tap($byUnit)
             ->whereNotNull('barber_id')
             ->selectRaw('barber_id, COUNT(*) as count, SUM(total_price) as revenue')
             ->groupBy('barber_id')
@@ -114,7 +85,6 @@ class ReportsController extends Controller
         $topCustomers = Appointment::where('tenant_id', $tenantId)
             ->where('status', AppointmentStatus::completed->value)
             ->whereBetween('starts_at', [$from, $to])
-            ->tap($byUnit)
             ->selectRaw('customer_id, COUNT(*) as count, SUM(total_price) as revenue')
             ->groupBy('customer_id')
             ->orderByDesc('revenue')
@@ -142,7 +112,6 @@ class ReportsController extends Controller
                 'commissions_paid' => $commissionsPaid,
                 // O que sobra pra barbearia depois de pagar (e provisionar) os funcionários.
                 'net_revenue' => round($revenue - $commissionsPending - $commissionsPaid, 2),
-                'per_unit' => $perUnit,
                 'top_barbers' => $topBarbers,
                 'top_customers' => $topCustomers,
             ],

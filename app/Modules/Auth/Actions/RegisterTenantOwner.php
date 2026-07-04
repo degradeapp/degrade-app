@@ -5,7 +5,6 @@ namespace App\Modules\Auth\Actions;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Services\TenantContext;
-use App\Modules\Unit\Models\Unit;
 use App\Modules\User\Enums\UserRole;
 use App\Modules\User\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -41,15 +40,6 @@ readonly class RegisterTenantOwner
             app(TenantContext::class)->set($tenant);
             app()->instance('tenant', $tenant);
 
-            // Toda barbearia nasce com 1 unidade. Multiunidade só é liberada no plano Rede;
-            // Solo/Barbearia ficam com esta única unidade (a UI de unidades fica escondida).
-            $unit = Unit::create([
-                'tenant_id' => $tenant->id,
-                'name' => 'Unidade principal',
-                'is_active' => true,
-            ]);
-
-            // Dono/gerente ficam sem unidade fixa (veem todas + consolidado), por isso unit_id null.
             $user = User::create([
                 'tenant_id' => $tenant->id,
                 'name' => $name,
@@ -66,7 +56,6 @@ readonly class RegisterTenantOwner
             // CommissionService nem gera comissão pra ele).
             Barber::create([
                 'tenant_id' => $tenant->id,
-                'unit_id' => $unit->id,
                 'user_id' => $user->id,
                 'name' => $name,
                 'phone' => $phone ? preg_replace('/\D/', '', $phone) : null,

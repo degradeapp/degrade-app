@@ -17,6 +17,7 @@ use App\Modules\Barber\Actions\UpdateBarber;
 use App\Modules\Barber\Actions\UpsertBarberSchedule;
 use App\Modules\Barber\Models\Barber;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 
@@ -26,7 +27,7 @@ class BarberController extends Controller
 
     public function index(): AnonymousResourceCollection
     {
-        $query = Barber::with('schedules', 'user:id,avatar_path', 'unit:id,name');
+        $query = Barber::with('schedules', 'user:id,avatar_path');
 
         if ($q = request('q')) {
             $query->where('name', 'like', "%{$q}%");
@@ -56,7 +57,6 @@ class BarberController extends Controller
             phone: $request->input('phone'),
             userId: $request->input('user_id'),
             defaultCommissionPercentage: $request->input('default_commission_percentage'),
-            unitId: $request->input('unit_id') ? (int) $request->input('unit_id') : null,
         );
 
         $this->applyDefaultSchedule($barber, $tenant);
@@ -118,7 +118,6 @@ class BarberController extends Controller
             phone: $request->input('phone'),
             defaultCommissionPercentage: $request->input('default_commission_percentage'),
             isActive: $request->input('is_active'),
-            unitId: $request->input('unit_id') ? (int) $request->input('unit_id') : null,
         );
 
         return response()->json(new BarberResource($updated->load('schedules', 'timeOffs')));
@@ -146,7 +145,7 @@ class BarberController extends Controller
         return response()->noContent();
     }
 
-    public function updatePhoto(Barber $barber, \Illuminate\Http\Request $request): JsonResponse
+    public function updatePhoto(Barber $barber, Request $request): JsonResponse
     {
         // Foto do barbeiro é conteúdo da barbearia (a cara que o cliente vê na equipe),
         // então segue a mesma permissão de gerir o barbeiro — não a conta pessoal dele.

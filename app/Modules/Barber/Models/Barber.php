@@ -23,7 +23,6 @@ class Barber extends Model
 
     protected $fillable = [
         'tenant_id',
-        'unit_id',
         'user_id',
         'name',
         'phone',
@@ -55,11 +54,6 @@ class Barber extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function unit()
-    {
-        return $this->belongsTo(\App\Modules\Unit\Models\Unit::class);
     }
 
     public function schedules()

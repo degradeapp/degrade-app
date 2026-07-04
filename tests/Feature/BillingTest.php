@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BillingPlan;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -177,8 +178,20 @@ class BillingTest extends TestCase
         $this->assertEquals('trial', $tenant->status);
     }
 
-    public function test_billing_plan_enum(): void
+    /**
+     * CONTRATO COMERCIAL dos planos. Se este teste quebrar, alguém mudou
+     * pricing de propósito: revise a decisão antes de ajustar os números.
+     * Solo = 1 profissional; Barbearia = até 10; o diferencial entre eles é
+     * SÓ o número de profissionais (nenhuma funcionalidade é exclusiva).
+     */
+    public function test_billing_plan_commercial_contract(): void
     {
+        // Exatamente dois planos: solo e barbearia. Rede foi extinto.
+        $this->assertEqualsCanonicalizing(
+            ['solo', 'barbearia'],
+            array_column(BillingPlan::cases(), 'value'),
+        );
+
         $solo = BillingPlan::solo;
         $this->assertEquals(59.00, $solo->price());
         $this->assertEquals(1, $solo->staffLimit());
@@ -186,11 +199,13 @@ class BillingTest extends TestCase
 
         $barbearia = BillingPlan::barbearia;
         $this->assertEquals(119.00, $barbearia->price());
-        $this->assertEquals(4, $barbearia->staffLimit());
+        $this->assertEquals(10, $barbearia->staffLimit());
+        $this->assertEquals('Barbearia', $barbearia->label());
 
-        $rede = BillingPlan::rede;
-        $this->assertEquals(219.00, $rede->price());
-        $this->assertEquals(10, $rede->staffLimit());
+        // O bot de WhatsApp 24h faz parte de TODOS os planos (a copy precisa dizer isso).
+        foreach (BillingPlan::cases() as $plan) {
+            $this->assertStringContainsString('bot de WhatsApp 24h', $plan->description());
+        }
     }
 
     public function test_tenant_staff_limit(): void
@@ -199,15 +214,44 @@ class BillingTest extends TestCase
         $this->assertEquals(1, $this->tenant->staffLimit());
 
         $this->tenant->update(['plan' => 'barbearia']);
-        $this->assertEquals(4, $this->tenant->staffLimit());
-
-        $this->tenant->update(['plan' => 'rede']);
         $this->assertEquals(10, $this->tenant->staffLimit());
+    }
+
+    /**
+     * R4: valor legado no banco (ex.: 'rede' antes da migração de dados) não
+     * pode derrubar a request. currentPlan() cai no Barbearia com warning.
+     */
+    public function test_unknown_plan_value_falls_back_to_barbearia(): void
+    {
+        DB::table('tenants')
+            ->where('id', $this->tenant->id)
+            ->update(['plan' => 'rede']);
+
+        $tenant = Tenant::find($this->tenant->id);
+
+        $this->assertEquals(BillingPlan::barbearia, $tenant->currentPlan());
+        $this->assertEquals(10, $tenant->staffLimit());
+    }
+
+    /**
+     * A migração de dados converte todo tenant que estava no Rede (extinto)
+     * para Barbearia: nenhum tenant fica com valor de enum inexistente.
+     */
+    public function test_data_migration_converts_rede_to_barbearia(): void
+    {
+        DB::table('tenants')
+            ->where('id', $this->tenant->id)
+            ->update(['plan' => 'rede']);
+
+        $migration = require database_path('migrations/2026_07_03_100000_convert_rede_plan_to_barbearia.php');
+        $migration->up();
+
+        $this->assertSame('barbearia', DB::table('tenants')->where('id', $this->tenant->id)->value('plan'));
     }
 
     public function test_tenant_can_add_barber_within_limit(): void
     {
-        // Barbearia (4) com apenas o dono cadastrado → ainda há vaga.
+        // Barbearia (10) com apenas o dono cadastrado → ainda há vaga.
         $this->tenant->update(['plan' => 'barbearia', 'status' => 'active']);
         $this->assertTrue($this->tenant->canAddBarber());
     }

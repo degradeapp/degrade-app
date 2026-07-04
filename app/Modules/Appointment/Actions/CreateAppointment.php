@@ -10,8 +10,6 @@ use App\Modules\Appointment\Services\AppointmentPricer;
 use App\Modules\Appointment\Services\AvailabilityService;
 use App\Modules\Appointment\Services\ConflictChecker;
 use App\Modules\Service\Models\Service;
-use App\Modules\Tenant\Services\UnitContext;
-use App\Modules\Unit\Models\Unit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -32,7 +30,6 @@ readonly class CreateAppointment
         ?array $barberIds = null,
         ?string $notes = null,
         array $priceOverrides = [],
-        ?int $unitId = null,
     ): Appointment {
         $services = Service::whereIn('id', $serviceIds)->get();
         $endsAt = $startsAt->copy()->addMinutes(Appointment::DEFAULT_BLOCK_MINUTES);
@@ -44,14 +41,8 @@ readonly class CreateAppointment
         // e walk-in ("Atender agora") acontece a qualquer hora. A UI já avisa quando o
         // horário está ocupado ("Encaixar mesmo assim?"). Só o passado é barrado (no Request).
         // O LINK PÚBLICO é diferente: lá a disponibilidade é checada ANTES de chamar
-        // esta action (PublicBookingController), e a unidade vem explícita ($unitId).
+        // esta action (PublicBookingController).
         $primaryBarber = collect($barberIds)->first(fn ($id) => $id !== null);
-
-        // Unidade do agendamento: explícita (link público / chamadas programáticas),
-        // senão a ativa da requisição, senão a 1ª do tenant (bot/jobs) pra NUNCA órfão.
-        $unitId = $unitId
-            ?? app(UnitContext::class)->currentUnitId()
-            ?? Unit::query()->orderBy('id')->value('id');
 
         return DB::transaction(function () use (
             $customerId,
@@ -63,11 +54,9 @@ readonly class CreateAppointment
             $services,
             $barberIds,
             $primaryBarber,
-            $priceOverrides,
-            $unitId
+            $priceOverrides
         ) {
             $appointment = Appointment::create([
-                'unit_id' => $unitId,
                 'customer_id' => $customerId,
                 'barber_id' => $primaryBarber,
                 'status' => AppointmentStatus::scheduled,

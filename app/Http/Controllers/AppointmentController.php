@@ -30,15 +30,6 @@ class AppointmentController extends Controller
     {
         $query = Appointment::with('services.service', 'services.barber', 'customer', 'barber');
 
-        // Segurança por unidade: barbeiro/recepção só enxergam a unidade deles (travado);
-        // dono/gerente podem filtrar por ?unit (senão veem a rede toda, é deles).
-        $unitCtx = app(\App\Modules\Tenant\Services\UnitContext::class);
-        if ($unitCtx->isLocked()) {
-            $query->where('unit_id', $unitCtx->currentUnitId());
-        } elseif (request()->query('unit')) {
-            $query->where('unit_id', (int) request()->query('unit'));
-        }
-
         if (request('status')) {
             $query->where('status', request('status'));
         }
@@ -114,18 +105,8 @@ class AppointmentController extends Controller
         $from = $earliest->copy()->subDays(14);
         $to = $latest->copy()->addDays(45)->endOfDay();
 
-        // Agenda é por unidade: barbeiro/recepção veem só a sua; dono/gerente, a ativa
-        // (ou a 1ª se em consolidado). Sem unidade (tenant antigo de teste) = sem filtro.
-        $unitId = app(\App\Modules\Tenant\Services\UnitContext::class)->currentUnitId();
-
-        $appointmentsQuery = Appointment::with(['customer', 'barber', 'services.service', 'services.barber'])
-            ->whereBetween('starts_at', [$from, $to]);
-
-        if ($unitId !== null) {
-            $appointmentsQuery->where('unit_id', $unitId);
-        }
-
-        $appointments = $appointmentsQuery
+        $appointments = Appointment::with(['customer', 'barber', 'services.service', 'services.barber'])
+            ->whereBetween('starts_at', [$from, $to])
             ->orderBy('starts_at')
             ->get()
             ->map(function (Appointment $apt) {
@@ -181,24 +162,21 @@ class AppointmentController extends Controller
         ])->all();
         $allServiceIds = $serviceModels->pluck('id')->all();
 
-        // Booking usa os barbeiros da unidade ativa (agenda é por unidade).
-        $unitId = app(\App\Modules\Tenant\Services\UnitContext::class)->currentUnitId();
-        $barbersQuery = Barber::with('services:id')->where('is_active', true);
-        if ($unitId !== null) {
-            $barbersQuery->where('unit_id', $unitId);
-        }
+        $barbers = Barber::with('services:id')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function (Barber $b) use ($allServiceIds) {
+                $explicit = $b->services->pluck('id')->all();
 
-        $barbers = $barbersQuery->orderBy('name')->get()->map(function (Barber $b) use ($allServiceIds) {
-            $explicit = $b->services->pluck('id')->all();
-
-            return [
-                'id' => $b->id,
-                'name' => $b->name,
-                'initials' => $this->initials($b->name),
-                // Sem vínculo explícito → faz todos os serviços (padrão de barbearia).
-                'service_ids' => ! empty($explicit) ? $explicit : $allServiceIds,
-            ];
-        })->all();
+                return [
+                    'id' => $b->id,
+                    'name' => $b->name,
+                    'initials' => $this->initials($b->name),
+                    // Sem vínculo explícito → faz todos os serviços (padrão de barbearia).
+                    'service_ids' => ! empty($explicit) ? $explicit : $allServiceIds,
+                ];
+            })->all();
 
         // Pré-seleção de cliente (vindo de "Agendar" na ficha do cliente).
         // Garante que ele esteja na lista mesmo que não tenha visitas recentes.

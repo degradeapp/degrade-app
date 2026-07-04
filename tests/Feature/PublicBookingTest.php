@@ -5,7 +5,6 @@ use App\Modules\Barber\Models\Barber;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
-use App\Modules\Unit\Models\Unit;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +15,7 @@ uses(RefreshDatabase::class);
 /**
  * Link público de agendamento (/api/public/agendar/{slug}).
  * Cobre: fluxo feliz, casamento de cliente existente, slug inválido, tenant
- * suspenso, passado, fora do expediente, serviço/barbeiro/unidade de outro
+ * suspenso, passado, fora do expediente, serviço/barbeiro de outro
  * tenant (isolação), rate limit e não-vazamento de dados no catálogo.
  */
 beforeEach(function () {
@@ -25,15 +24,8 @@ beforeEach(function () {
 
     $this->tenant = Tenant::factory()->create(['slug' => 'barbearia-teste', 'status' => 'active']);
 
-    $this->unit = Unit::create([
-        'tenant_id' => $this->tenant->id,
-        'name' => 'Unidade principal',
-        'is_active' => true,
-    ]);
-
     $this->barber = Barber::factory()->create([
         'tenant_id' => $this->tenant->id,
-        'unit_id' => $this->unit->id,
         'is_active' => true,
     ]);
 
@@ -123,7 +115,6 @@ it('cria agendamento publico no fluxo feliz', function () {
 
     $appointment = Appointment::withoutGlobalScopes()->latest('id')->first();
     expect($appointment->tenant_id)->toBe($this->tenant->id)
-        ->and($appointment->unit_id)->toBe($this->unit->id)
         ->and($appointment->source->value)->toBe('customer')
         ->and((float) $appointment->total_price)->toBe(50.0);
 
@@ -171,7 +162,6 @@ it('rejeita horario ja ocupado (link publico nao encaixa)', function () {
 
     DB::table('appointments')->insert([
         'tenant_id' => $this->tenant->id,
-        'unit_id' => $this->unit->id,
         'customer_id' => Customer::factory()->create(['tenant_id' => $this->tenant->id])->id,
         'barber_id' => $this->barber->id,
         'status' => 'scheduled',
@@ -209,15 +199,6 @@ it('nao aceita barbeiro de outro tenant (isolacao)', function () {
     expect(Appointment::withoutGlobalScopes()->count())->toBe(0);
 });
 
-it('nao aceita unidade de outro tenant (isolacao)', function () {
-    $other = Tenant::factory()->create();
-    $foreignUnit = Unit::create(['tenant_id' => $other->id, 'name' => 'Outra', 'is_active' => true]);
-
-    $this->postJson('/api/public/agendar/barbearia-teste', ($this->validPayload)([
-        'unit_id' => $foreignUnit->id,
-    ]))->assertNotFound();
-});
-
 it('aplica rate limit na criacao publica', function () {
     // Payload inválido de propósito: o throttle conta a request antes da
     // validação, então dá pra estourar o limite sem criar agendamento.
@@ -238,7 +219,7 @@ it('valida telefone brasileiro e nome', function () {
     ]))->assertUnprocessable()->assertJsonValidationErrors('name');
 });
 
-it('no modo qualquer barbeiro escolhe um disponivel da unidade', function () {
+it('no modo qualquer barbeiro escolhe um disponivel', function () {
     $response = $this->postJson('/api/public/agendar/barbearia-teste', ($this->validPayload)([
         'barber_id' => null,
     ]));

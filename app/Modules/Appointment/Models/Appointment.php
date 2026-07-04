@@ -25,7 +25,6 @@ class Appointment extends Model
 
     protected $fillable = [
         'tenant_id',
-        'unit_id',
         'customer_id',
         'barber_id',
         'status',
@@ -64,11 +63,6 @@ class Appointment extends Model
     public function barber()
     {
         return $this->belongsTo(Barber::class);
-    }
-
-    public function unit()
-    {
-        return $this->belongsTo(\App\Modules\Unit\Models\Unit::class);
     }
 
     public function services()

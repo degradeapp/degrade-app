@@ -10,6 +10,7 @@ use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
 
 class Tenant extends Model
 {
@@ -56,11 +57,6 @@ class Tenant extends Model
         return $this->hasMany(Barber::class);
     }
 
-    public function units()
-    {
-        return $this->hasMany(\App\Modules\Unit\Models\Unit::class);
-    }
-
     public function whatsappAccount()
     {
         return $this->hasOne(WhatsappAccount::class);
@@ -104,9 +100,27 @@ class Tenant extends Model
         $this->save();
     }
 
+    /**
+     * tryFrom defensivo: se o banco tiver um valor de plano que o enum não
+     * conhece mais (ex.: 'rede' antes da migração de dados rodar), cai no
+     * Barbearia com warning em vez de estourar a request inteira.
+     */
     public function currentPlan(): ?BillingPlan
     {
-        return $this->plan ? BillingPlan::from($this->plan) : null;
+        if (! $this->plan) {
+            return null;
+        }
+
+        $plan = BillingPlan::tryFrom($this->plan);
+
+        if (! $plan) {
+            Log::warning('Plano desconhecido no tenant; usando Barbearia como fallback.', [
+                'tenant_id' => $this->id,
+                'plan' => $this->plan,
+            ]);
+        }
+
+        return $plan ?? BillingPlan::barbearia;
     }
 
     public function staffLimit(): int
@@ -140,25 +154,6 @@ class Tenant extends Model
     public function canAddBarber(): bool
     {
         return $this->staffCount() < $this->effectiveStaffLimit();
-    }
-
-    /**
-     * Limite de unidades do plano. Só o Rede tem várias unidades; Solo/Barbearia = 1.
-     * Sem plano (trial) cai no Barbearia (1), pra não liberar multiunidade antes de assinar.
-     */
-    public function effectiveUnitLimit(): int
-    {
-        return ($this->currentPlan() ?? BillingPlan::barbearia)->unitLimit();
-    }
-
-    public function unitsCount(): int
-    {
-        return $this->units()->count();
-    }
-
-    public function canAddUnit(): bool
-    {
-        return $this->unitsCount() < $this->effectiveUnitLimit();
     }
 
     public function canAddTeamMember(): bool

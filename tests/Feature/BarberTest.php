@@ -9,6 +9,8 @@ use App\Modules\Barber\Models\Barber;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BarberTest extends TestCase
@@ -257,7 +259,7 @@ class BarberTest extends TestCase
     {
         // A foto do barbeiro-com-login É a foto de perfil dele: subir pela Equipe
         // reflete em "Meu perfil" (e remover também).
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
         $this->actingAs($this->owner);
 
         $barber = Barber::create([
@@ -268,7 +270,7 @@ class BarberTest extends TestCase
         ]);
 
         $this->postJson("/api/barbers/{$barber->id}/photo", [
-            'photo' => \Illuminate\Http\UploadedFile::fake()->create('foto.jpg', 200, 'image/jpeg'),
+            'photo' => UploadedFile::fake()->create('foto.jpg', 200, 'image/jpeg'),
         ])->assertOk();
 
         $barber->refresh();
@@ -524,15 +526,17 @@ class BarberTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        // setUp já tem 3 funcionários (dono, gerente, recepção). Sem plano → limite Barbearia (4).
-        // 1º barbeiro ocupa a 4ª (última) vaga.
-        $this->postJson('/api/barbers', [
-            'name' => 'B1', 'phone' => '92991234567', 'default_commission_percentage' => 20,
-        ])->assertStatus(201);
+        // setUp já tem 3 funcionários (dono, gerente, recepção). Sem plano → limite Barbearia (10).
+        // Preenche até a 10ª (última) vaga: cabem mais 7 barbeiros.
+        foreach (range(1, 7) as $i) {
+            $this->postJson('/api/barbers', [
+                'name' => "B{$i}", 'phone' => '9299123456'.$i, 'default_commission_percentage' => 20,
+            ])->assertStatus(201);
+        }
 
-        // 5º funcionário → bloqueado
+        // 11º funcionário → bloqueado
         $this->postJson('/api/barbers', [
-            'name' => 'B2', 'phone' => '92991230002', 'default_commission_percentage' => 20,
+            'name' => 'Excedente', 'phone' => '92991230002', 'default_commission_percentage' => 20,
         ])->assertStatus(403);
     }
 

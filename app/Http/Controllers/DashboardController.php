@@ -6,7 +6,6 @@ use App\Enums\AppointmentStatus;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Commission\Models\Commission;
-use App\Modules\Tenant\Services\UnitContext;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,21 +20,13 @@ class DashboardController extends Controller
         // Recepcionista/barbeiro veem a parte operacional (agenda, ocupação), sem dinheiro.
         $canSeeFinance = $user->isOwner() || $user->isManager();
 
-        // Escopo de unidade: barbeiro/recepção veem só a sua; dono/gerente veem a unidade
-        // selecionada OU consolidado (null = todas). Tenant sem unidade (teste antigo) = todas.
-        $unitId = app(UnitContext::class)->scopedUnitId();
-
         $today = Carbon::now()->startOfDay();
         $tomorrow = $today->copy()->addDay();
 
-        $todayQuery = Appointment::with(['customer', 'barber', 'services.service'])
-            ->whereBetween('starts_at', [$today, $tomorrow]);
-
-        if ($unitId !== null) {
-            $todayQuery->where('unit_id', $unitId);
-        }
-
-        $todayAppointments = $todayQuery->orderBy('starts_at')->get();
+        $todayAppointments = Appointment::with(['customer', 'barber', 'services.service'])
+            ->whereBetween('starts_at', [$today, $tomorrow])
+            ->orderBy('starts_at')
+            ->get();
 
         $now = Carbon::now();
 
@@ -93,15 +84,14 @@ class DashboardController extends Controller
             $trialDaysLeft = (int) ceil($diff);
         }
 
-        $revenueWeek = $canSeeFinance ? $this->revenueLast7Days($tenant?->id, $unitId) : [];
+        $revenueWeek = $canSeeFinance ? $this->revenueLast7Days($tenant?->id) : [];
         $pendingCommissions = $canSeeFinance && $tenant
             ? (float) Commission::where('tenant_id', $tenant->id)
                 ->where('status', 'pending')
-                ->when($unitId !== null, fn ($q) => $q->whereHas('appointment', fn ($a) => $a->where('unit_id', $unitId)))
                 ->sum('amount')
             : 0.0;
         $occupation = $tenant
-            ? $this->occupationToday($tenant->id, $todayAppointments, $unitId)
+            ? $this->occupationToday($tenant->id, $todayAppointments)
             : ['rate' => 0, 'booked_hours' => 0.0, 'available_hours' => 0.0];
 
         return Inertia::render('Dashboard/Index', [
@@ -137,7 +127,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function revenueLast7Days(?int $tenantId, ?int $unitId = null): array
+    private function revenueLast7Days(?int $tenantId): array
     {
         if (! $tenantId) {
             return [];
@@ -148,7 +138,6 @@ class DashboardController extends Controller
 
         $rows = Appointment::where('tenant_id', $tenantId)
             ->where('status', AppointmentStatus::completed->value)
-            ->when($unitId !== null, fn ($q) => $q->where('unit_id', $unitId))
             ->whereBetween('starts_at', [$start, $end])
             ->selectRaw('DATE(starts_at) as day, SUM(total_price) as total')
             ->groupBy('day')
@@ -177,18 +166,16 @@ class DashboardController extends Controller
      *   Cancelado e falta (no-show) NÃO contam: a cadeira ficou vazia (padrão de mercado
      *   de utilization rate, onde no-show é capacidade não preenchida).
      */
-    private function occupationToday(int $tenantId, $todayAppointments, ?int $unitId = null): array
+    private function occupationToday(int $tenantId, $todayAppointments): array
     {
         $now = Carbon::now();
         $dow = $now->dayOfWeek;          // 0=Dom..6=Sáb (mesma convenção dos horários)
         $today = $now->toDateString();
 
-        // Expediente da unidade ativa (consolidado = todos os barbeiros do tenant).
         // E2: folga de HOJE carregada junto (eager load), em vez de um exists()
         // por barbeiro dentro do loop (N+1).
         $barbers = Barber::where('tenant_id', $tenantId)
             ->where('is_active', true)
-            ->when($unitId !== null, fn ($q) => $q->where('unit_id', $unitId))
             ->with([
                 'schedules' => fn ($q) => $q->where('day_of_week', $dow),
                 'timeOffs' => fn ($q) => $q->where('date', '<=', $today)

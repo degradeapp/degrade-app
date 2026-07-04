@@ -32,7 +32,6 @@ class StoreBarberRequest extends FormRequest
             'phone' => ['required', 'string', new BrazilianPhone],
             'user_id' => ['nullable', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'default_commission_percentage' => 'nullable|numeric|min:0|max:100',
-            'unit_id' => 'nullable|integer',
         ];
     }
 }

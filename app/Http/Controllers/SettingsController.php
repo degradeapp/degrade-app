@@ -5,9 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ManagesImageUploads;
 use App\Modules\Billing\Services\BillingService;
 use App\Modules\Tenant\Models\Tenant;
-use App\Modules\Tenant\Services\UnitContext;
-use App\Modules\Unit\Models\Unit;
 use App\Modules\User\Models\User;
+use App\Rules\BrazilianPhone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -111,7 +110,6 @@ class SettingsController extends Controller
             'email' => 'required|email|max:150|unique:users,email',
             'role' => 'required|in:owner,manager,receptionist,barber',
             'password' => 'required|string|min:8|max:72',
-            'unit_id' => 'nullable|integer',
         ]);
 
         $tenant = app('tenant');
@@ -122,24 +120,12 @@ class SettingsController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Barbeiro/recepção SEMPRE numa unidade (segurança: balcão é escopado por unidade).
-        // Usa a unidade do form se válida, senão a ativa, senão a 1ª. Dono/gerente = null (todas).
-        $role = $request->input('role');
-        $unitId = null;
-        if (in_array($role, ['receptionist', 'barber'], true)) {
-            $reqUnit = $request->input('unit_id');
-            $unitId = ($reqUnit && Unit::where('id', (int) $reqUnit)->exists())
-                ? (int) $reqUnit
-                : (app(UnitContext::class)->currentUnitId() ?? Unit::query()->orderBy('id')->value('id'));
-        }
-
         $user = User::create([
             'tenant_id' => app('tenant')->id,
-            'unit_id' => $unitId,
             'name' => $request->input('name'),
             'email' => $request->input('email'),
             'password' => $request->input('password'),
-            'role' => $role,
+            'role' => $request->input('role'),
         ]);
 
         return response()->json([
@@ -270,7 +256,7 @@ class SettingsController extends Controller
         $request->validate([
             'name' => 'sometimes|string|min:2|max:100',
             'email' => 'sometimes|email|max:150|unique:users,email,'.$user->id,
-            'phone' => ['sometimes', 'nullable', 'string', new \App\Rules\BrazilianPhone],
+            'phone' => ['sometimes', 'nullable', 'string', new BrazilianPhone],
         ]);
 
         if ($request->has('name')) {

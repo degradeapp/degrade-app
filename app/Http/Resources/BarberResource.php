@@ -20,8 +20,6 @@ class BarberResource extends JsonResource
             'default_commission_percentage' => $this->default_commission_percentage,
             'is_active' => $this->is_active,
             'user_id' => $this->user_id,
-            'unit_id' => $this->unit_id,
-            'unit_name' => $this->whenLoaded('unit', fn () => $this->unit?->name),
             'schedules' => BarberScheduleResource::collection($this->whenLoaded('schedules')),
             'time_offs' => $this->whenLoaded('timeOffs', fn () => $this->timeOffs->map(fn ($t) => [
                 'date' => $t->date instanceof Carbon ? $t->date->toDateString() : $t->date,

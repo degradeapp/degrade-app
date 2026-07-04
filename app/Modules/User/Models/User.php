@@ -2,6 +2,7 @@
 
 namespace App\Modules\User\Models;
 
+use App\Modules\Barber\Models\Barber;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Traits\BelongsToTenant;
 use App\Modules\User\Enums\UserRole;
@@ -21,7 +22,6 @@ class User extends Authenticatable
 
     protected $fillable = [
         'tenant_id',
-        'unit_id',
         'name',
         'email',
         'password',
@@ -47,18 +47,12 @@ class User extends Authenticatable
         return $this->belongsTo(Tenant::class);
     }
 
-    // Unidade "casa": barbeiro/recepção ficam presos nela. Dono/gerente = null (veem todas).
-    public function unit()
-    {
-        return $this->belongsTo(\App\Modules\Unit\Models\Unit::class);
-    }
-
     // Dono e barbeiros-com-login têm um registro de Barber vinculado: é a MESMA
     // pessoa (perfil de conta = membro da equipe). Usado pra manter nome/telefone/foto
     // em sincronia entre "Meu perfil" e "Equipe".
     public function barber()
     {
-        return $this->hasOne(\App\Modules\Barber\Models\Barber::class);
+        return $this->hasOne(Barber::class);
     }
 
     public function avatarUrl(): ?string

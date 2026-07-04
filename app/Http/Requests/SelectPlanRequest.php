@@ -14,7 +14,7 @@ class SelectPlanRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan' => 'required|string|in:solo,barbearia,rede',
+            'plan' => 'required|string|in:solo,barbearia',
         ];
     }
 

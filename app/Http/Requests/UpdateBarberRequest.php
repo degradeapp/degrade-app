@@ -26,7 +26,6 @@ class UpdateBarberRequest extends FormRequest
             'phone' => ['required', 'string', new BrazilianPhone],
             'default_commission_percentage' => 'nullable|numeric|min:0|max:100',
             'is_active' => 'nullable|boolean',
-            'unit_id' => 'nullable|integer',
         ];
     }
 }

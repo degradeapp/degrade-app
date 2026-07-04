@@ -3,7 +3,6 @@
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -86,7 +85,6 @@ Route::middleware(['auth:sanctum', 'subscription.active', 'onboarding.completed'
     // --- Só dono (conta: acessos, cobrança, credenciais de integração) ---
     Route::middleware('role:owner')->group(function () {
         Route::inertia('/settings/team', 'Settings/Team');
-        Route::inertia('/settings/units', 'Settings/Units');
         Route::inertia('/billing', 'Billing/Index');
         Route::inertia('/whatsapp/setup', 'WhatsApp/Setup');
     });

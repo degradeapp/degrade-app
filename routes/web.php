@@ -26,7 +26,6 @@ require __DIR__.'/modules/onboarding.php';
 require __DIR__.'/modules/whatsapp.php';
 require __DIR__.'/modules/audit.php';
 require __DIR__.'/modules/reports.php';
-require __DIR__.'/modules/unit.php';
 
 // Link público de agendamento (sem auth, tenant via slug, throttle por IP)
 require __DIR__.'/modules/public_booking.php';

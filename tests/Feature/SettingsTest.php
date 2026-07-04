@@ -412,10 +412,10 @@ class SettingsTest extends TestCase
 
     public function test_team_invite_blocked_at_staff_limit(): void
     {
-        $this->tenant->update(['plan' => 'barbearia']); // 4 funcionários no total
+        $this->tenant->update(['plan' => 'barbearia']); // 10 funcionários no total
 
-        // setUp já tem o dono (1). Mais 3 = 4 (no limite).
-        foreach (range(1, 3) as $i) {
+        // setUp já tem o dono (1). Mais 9 = 10 (no limite).
+        foreach (range(1, 9) as $i) {
             User::factory()->create([
                 'tenant_id' => $this->tenant->id,
                 'role' => 'receptionist',
@@ -423,7 +423,7 @@ class SettingsTest extends TestCase
             ]);
         }
 
-        // 5º funcionário — qualquer papel — é bloqueado (limite único, sem brecha por papel).
+        // 11º funcionário, qualquer papel, é bloqueado (limite único, sem brecha por papel).
         $this->actingAs($this->owner)
             ->postJson('/api/tenant/team', [
                 'name' => 'Excedente',

@@ -9,7 +9,6 @@ use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Tenant\Services\TenantContext;
-use App\Modules\Tenant\Services\UnitContext;
 use App\Observers\AuditObserver;
 use App\Policies\BillingPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -23,7 +22,6 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class, fn () => new TenantContext);
-        $this->app->singleton(UnitContext::class, fn () => new UnitContext);
     }
 
     public function boot(): void

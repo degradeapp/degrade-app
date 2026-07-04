@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\BillingPlan;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,30 +24,18 @@ class BillingResource extends JsonResource
         ];
     }
 
+    /**
+     * Deriva do enum (fonte única): preço, limite e copy nunca divergem
+     * entre a tela de cobrança e a regra de negócio.
+     */
     private function getAvailablePlans(): array
     {
-        return [
-            [
-                'plan' => 'solo',
-                'label' => 'Solo',
-                'price' => 59.00,
-                'staff_limit' => 1,
-                'description' => '1 profissional · agenda, lembrete no WhatsApp, comissões e caixa',
-            ],
-            [
-                'plan' => 'barbearia',
-                'label' => 'Barbearia',
-                'price' => 119.00,
-                'staff_limit' => 4,
-                'description' => 'Até 4 profissionais · bot de WhatsApp 24h, relatórios completos e suporte prioritário',
-            ],
-            [
-                'plan' => 'rede',
-                'label' => 'Rede',
-                'price' => 219.00,
-                'staff_limit' => 10,
-                'description' => 'Até 10 profissionais · várias unidades, relatório consolidado e suporte dedicado',
-            ],
-        ];
+        return array_map(fn (BillingPlan $plan) => [
+            'plan' => $plan->value,
+            'label' => $plan->label(),
+            'price' => $plan->price(),
+            'staff_limit' => $plan->staffLimit(),
+            'description' => $plan->description(),
+        ], BillingPlan::cases());
     }
 }

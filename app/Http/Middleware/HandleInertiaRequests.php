@@ -44,15 +44,6 @@ class HandleInertiaRequests extends Middleware
                 'onboarding_completed_at' => $tenant->onboarding_completed_at?->toIso8601String(),
             ] : null,
 
-            // Unidades da rede + unidade ativa. Barbeiro/recepção não trocam (can_switch=false).
-            'units' => $tenant ? [
-                'list' => app(\App\Modules\Tenant\Services\UnitContext::class)->units()
-                    ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values(),
-                'active_id' => app(\App\Modules\Tenant\Services\UnitContext::class)->scopedUnitId(),
-                'can_switch' => app(\App\Modules\Tenant\Services\UnitContext::class)->canSwitch(),
-                'multiple' => app(\App\Modules\Tenant\Services\UnitContext::class)->hasMultiple(),
-            ] : null,
-
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

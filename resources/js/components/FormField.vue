@@ -4,7 +4,7 @@
       <input
         :id="id"
         :type="type"
-        :value="modelValue"
+        :value="modelValue ?? ''"
         :placeholder="placeholder || ' '"
         :disabled="disabled"
         :required="required"
@@ -47,7 +47,7 @@ import { computed } from 'vue'
 
 interface Props {
   id?: string
-  modelValue: string | number
+  modelValue: string | number | null
   label?: string
   type?: 'text' | 'email' | 'password' | 'tel' | 'number' | 'date' | 'time'
   placeholder?: string

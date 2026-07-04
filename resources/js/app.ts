@@ -11,7 +11,7 @@ createInertiaApp({
     const resolvePageComponent = (path: string) => {
       const page = pages[path]
       if (!page) throw new Error(`Page not found: ${name}`)
-      return page()
+      return page().then((module) => module.default)
     }
 
     return resolvePageComponent(`./pages/${name}.vue`)

@@ -108,7 +108,7 @@ const photoUrl = ref<string | null>(null)
 const form = reactive({
   name: '',
   phone: '',
-  default_commission_percentage: 15,
+  default_commission_percentage: 15 as number | null,
   is_active: true,
 })
 

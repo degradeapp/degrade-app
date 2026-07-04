@@ -59,7 +59,7 @@
             <p v-if="customer.phone" class="text-[12px] text-[#A1A1A1] truncate leading-tight">{{ formatPhone(customer.phone) }}</p>
             <p class="text-[11px] text-[#6B6B6B] tabular-nums leading-tight">
               {{ customer.total_visits ?? 0 }} {{ Number(customer.total_visits) === 1 ? 'visita' : 'visitas' }}
-              <span v-if="Number(customer.total_spent) > 0"> · {{ formatBRL(customer.total_spent) }}</span>
+              <span v-if="Number(customer.total_spent) > 0"> · {{ formatBRL(Number(customer.total_spent)) }}</span>
             </p>
           </div>
           <ChevronRight :size="16" class="text-[#3D3D3D] flex-shrink-0" :stroke-width="1.75" />

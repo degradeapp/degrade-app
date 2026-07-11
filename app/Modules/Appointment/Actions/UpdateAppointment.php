@@ -6,7 +6,6 @@ use App\Events\AppointmentRescheduled;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Appointment\Services\AppointmentPricer;
 use App\Modules\Appointment\Services\AvailabilityService;
-use App\Modules\Barber\Models\Barber;
 use App\Modules\Service\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;

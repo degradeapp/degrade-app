@@ -383,6 +383,7 @@ class CustomerTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['phone']);
     }
+
     public function test_owner_can_export_customers_csv(): void
     {
         Customer::create(['tenant_id' => $this->tenant->id, 'name' => 'Zé Acentuação', 'phone' => '92991110000']);

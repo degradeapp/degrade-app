@@ -2,20 +2,66 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  test:
+  # Espelha o dev: suíte inteira em SQLite :memory: + lint + build do front
+  sqlite:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite
+          coverage: none
+
+      - name: Dependências PHP
+        run: composer install --no-interaction --no-progress
+
+      - name: .env de teste
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Formatação (Pint)
+        run: composer lint:check
+
+      - name: Testes (SQLite)
+        run: php artisan test
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Dependências JS
+        run: npm ci
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Build do frontend
+        run: npm run build
+
+  # Espelha a produção: migra uma base VAZIA e roda a suíte inteira em Postgres
+  # (pega diferença SQLite vs Postgres: varchar imposto, formato de TIME, LIKE...)
+  pgsql:
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16
         env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: degrade_test
+          POSTGRES_USER: degrade
+          POSTGRES_PASSWORD: degrade
+          POSTGRES_DB: degrade_ci
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -24,61 +70,34 @@ jobs:
         ports:
           - 5432:5432
 
-      redis:
-        image: redis:latest
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: degrade_ci
+      DB_USERNAME: degrade
+      DB_PASSWORD: degrade
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pdo_pgsql,redis,mbstring
-          tools: composer:v2.7
+          extensions: mbstring, intl, pdo_pgsql
+          coverage: none
 
-      - name: Install PHP dependencies
-        run: composer install --no-interaction
+      - name: Dependências PHP
+        run: composer install --no-interaction --no-progress
 
-      - name: Setup .env for testing
+      - name: .env de teste
         run: |
-          cp .env.example .env.testing
-          echo "DB_CONNECTION=pgsql" >> .env.testing
-          echo "DB_HOST=127.0.0.1" >> .env.testing
-          echo "DB_DATABASE=degrade_test" >> .env.testing
-          echo "DB_USERNAME=postgres" >> .env.testing
-          echo "DB_PASSWORD=postgres" >> .env.testing
+          cp .env.example .env
+          php artisan key:generate
 
-      - name: Generate app key
-        run: php artisan key:generate --env=testing
+      - name: Migração completa numa base vazia
+        run: php artisan migrate --force
 
-      - name: Run migrations
-        run: php artisan migrate --env=testing
-
-      - name: Run tests
-        run: composer test
-
-      - name: Run linting
-        run: composer lint -- --test
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install Node dependencies
-        run: npm install
-
-      - name: Run TypeScript type-check
-        run: npm run type-check
-
-      - name: Build frontend
-        run: npm run build
+      - name: Testes (PostgreSQL)
+        run: php artisan test

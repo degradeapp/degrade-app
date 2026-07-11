@@ -4,6 +4,7 @@ namespace App\Modules\Barber\Models;
 
 use App\Enums\DayOfWeek;
 use App\Modules\Tenant\Traits\BelongsToTenant;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class BarberSchedule extends Model
@@ -21,6 +22,20 @@ class BarberSchedule extends Model
     protected $casts = [
         'day_of_week' => DayOfWeek::class,
     ];
+
+    /**
+     * Coluna TIME volta '08:00:00' no PostgreSQL e '08:00' no SQLite; o app
+     * inteiro (telas, inputs type=time, validação H:i) fala 'H:i'.
+     */
+    protected function startTime(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => $value === null ? null : substr($value, 0, 5));
+    }
+
+    protected function endTime(): Attribute
+    {
+        return Attribute::get(fn (?string $value) => $value === null ? null : substr($value, 0, 5));
+    }
 
     public function barber()
     {

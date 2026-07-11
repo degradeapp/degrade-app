@@ -13,6 +13,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        // Helpers de tenant serão criados em Fase 2
+        // public/build é gitignored: num checkout limpo (CI) o manifest do
+        // Vite não existe e QUALQUER página renderizada estoura 500
+        $this->withoutVite();
     }
 }

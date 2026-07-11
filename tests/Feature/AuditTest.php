@@ -45,7 +45,9 @@ test('audit logs customer update', function () {
 
     expect($log)->not->toBeNull();
     expect($log->model_type)->toBe(Customer::class);
-    expect($log->old_values)->toContain($originalName);
+    // compara o valor decodificado: o JSON escapa acento (í) e o
+    // faker pt_BR gera nome acentuado, então containment na string crua falha
+    expect(json_decode($log->old_values, true)['name'])->toBe($originalName);
 });
 
 test('audit logs customer deletion', function () {

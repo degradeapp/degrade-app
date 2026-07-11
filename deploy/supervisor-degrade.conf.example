@@ -1,0 +1,16 @@
+; /etc/supervisor/conf.d/degrade.conf
+; Worker da fila (QUEUE_CONNECTION=database). Depois de copiar:
+;   supervisorctl reread && supervisorctl update && supervisorctl start degrade-worker:*
+
+[program:degrade-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/degrade/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=deploy
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/degrade/storage/logs/worker.log
+stopwaitsecs=3600

@@ -1,0 +1,47 @@
+# /etc/nginx/sites-available/degrade
+# Ativar com: ln -s /etc/nginx/sites-available/degrade /etc/nginx/sites-enabled/
+# HTTPS: rodar `certbot --nginx -d SEU_DOMINIO` depois; o certbot reescreve
+# este bloco adicionando o listen 443 e o redirect.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name SEU_DOMINIO;
+
+    root /var/www/degrade/public;
+    index index.php;
+
+    charset utf-8;
+
+    # Fotos de perfil sobem por upload (limite da app é menor; folga aqui)
+    client_max_body_size 10m;
+
+    add_header X-Content-Type-Options nosniff;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    # Assets do Vite com hash no nome: cache longo
+    location /build/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Bloqueia dotfiles (exceto o desafio do certbot)
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    error_page 404 /index.php;
+}

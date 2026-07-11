@@ -43,8 +43,10 @@ sudo apt install -y php8.4-fpm php8.4-cli php8.4-pgsql php8.4-mbstring \
 curl -sS https://getcomposer.org/installer | php
 sudo mv composer.phar /usr/local/bin/composer
 
-# Node 22 LTS (só pra buildar o frontend; não roda nada em produção)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+# Node 24 LTS (só pra buildar o frontend; não roda nada em produção).
+# Precisa ser 24+ (npm 11): o package-lock do repo é escrito pelo npm 11
+# e o npm 10 rejeita ele no npm ci.
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Servidor web, banco, worker, HTTPS, backup

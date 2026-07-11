@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -35,10 +35,12 @@ jobs:
       - name: Testes (SQLite)
         run: php artisan test
 
-      - name: Node 22
-        uses: actions/setup-node@v4
+      # Node 24 espelha o dev: o package-lock é escrito pelo npm 11 e o
+      # npm 10 (node 22) rejeita o lock (deps opcionais wasm do tailwind)
+      - name: Node 24
+        uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       - name: Dependências JS
@@ -79,7 +81,7 @@ jobs:
       DB_PASSWORD: degrade
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: PHP 8.4
         uses: shivammathur/setup-php@v2

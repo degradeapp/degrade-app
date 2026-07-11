@@ -3,14 +3,17 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\File;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
 /**
  * Backup diário do banco pra storage/app/backups (retém os últimos 7).
- * O envio pra fora (R2/S3) está CONGELADO; quando liberar, é só anexar o
- * upload ao final deste comando. Em produção (PostgreSQL) usa pg_dump -Fc;
- * em dev (SQLite) copia o arquivo, então o comando roda igual nos dois.
+ * Se BACKUP_REMOTE_DISK estiver preenchido (ex.: 'r2'), uma cópia sobe pro
+ * disk remoto; vazio, fica só o local (destino R2/S3 congelado até existir
+ * conta). Em produção (PostgreSQL) usa pg_dump -Fc; em dev (SQLite) copia
+ * o arquivo, então o comando roda igual nos dois.
  */
 class BackupDatabase extends Command
 {
@@ -44,7 +47,32 @@ class BackupDatabase extends Command
 
         $this->info('Backup gerado: '.$file);
 
+        $remote = (string) config('backup.remote_disk');
+        if ($remote !== '' && ! $this->uploadToRemote($remote, $file)) {
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
+    }
+
+    private function uploadToRemote(string $disk, string $file): bool
+    {
+        try {
+            $ok = Storage::disk($disk)->putFileAs('db', new File($file), basename($file)) !== false;
+        } catch (\Throwable $e) {
+            report($e);
+            $ok = false;
+        }
+
+        if (! $ok) {
+            $this->error("Falha ao enviar a cópia externa pro disk '{$disk}' (backup local preservado).");
+
+            return false;
+        }
+
+        $this->info("Cópia externa enviada: {$disk}:db/".basename($file));
+
+        return true;
     }
 
     private function backupPostgres(string $dir, string $stamp): ?string

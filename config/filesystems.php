@@ -60,6 +60,20 @@ return [
             'report' => false,
         ],
 
+        // Cloudflare R2 (S3-compatível). Só usado pela cópia externa do backup
+        // (BACKUP_REMOTE_DISK=r2); inerte enquanto as R2_* estiverem vazias.
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY'),
+            'secret' => env('R2_SECRET_KEY'),
+            'bucket' => env('R2_BUCKET'),
+            'endpoint' => env('R2_ENDPOINT'),
+            'region' => 'auto',
+            'use_path_style_endpoint' => true,
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

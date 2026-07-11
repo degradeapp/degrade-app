@@ -34,6 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Sentry: reporta exceções não tratadas. Inerte com SENTRY_LARAVEL_DSN vazio.
+        \Sentry\Laravel\Integration::handles($exceptions);
+
         // Sessão expirada/sem login em chamada de API (JSON): mensagem em pt-BR.
         // Navegação de tela (não-JSON) segue o padrão do Laravel: redireciona pro login.
         $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, \Illuminate\Http\Request $request) {

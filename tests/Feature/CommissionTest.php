@@ -9,6 +9,7 @@ use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CommissionTest extends TestCase
@@ -470,5 +471,135 @@ class CommissionTest extends TestCase
         $this->getJson('/api/commissions/pending-summary')
             ->assertOk()
             ->assertJsonPath('data.0.barber_name', 'Test Barber');
+    }
+
+    public function test_commission_follows_the_barber_sent_for_each_service(): void
+    {
+        $this->actingAs($this->owner);
+
+        // Corte Simples (setUp): R$ 100 a 20% = R$ 20.
+        $barba = Service::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Barba',
+            'duration_minutes' => 15,
+            'price' => 50.00,
+            'commission_percentage' => 15,
+        ]);
+
+        $barber2User = User::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Second Barber User',
+            'email' => 'barber2@test.local',
+            'password' => 'password',
+            'role' => 'barber',
+        ]);
+
+        $barber2 = Barber::create([
+            'tenant_id' => $this->tenant->id,
+            'user_id' => $barber2User->id,
+            'name' => 'Second Barber',
+            'phone' => '92987654321',
+            'default_commission_percentage' => 12,
+        ]);
+
+        foreach (range(0, 6) as $dow) {
+            $barber2->schedules()->create([
+                'tenant_id' => $this->tenant->id,
+                'day_of_week' => $dow,
+                'start_time' => '00:00',
+                'end_time' => '23:59',
+            ]);
+        }
+
+        // service_ids vai em ordem DECRESCENTE de id de propósito (a tela pode
+        // mandar na ordem que o usuário escolheu). barber_ids é PARALELO a ele:
+        // Barba -> barber2, Corte Simples -> barber1. Se o pareamento for feito
+        // pela ordem que o banco devolve (whereIn não garante ordem), os dois
+        // barbeiros trocam de serviço e a comissão vai pra pessoa errada.
+        $appointmentId = $this->postJson('/api/appointments', [
+            'customer_id' => $this->customer->id,
+            'service_ids' => [$barba->id, $this->service->id],
+            'barber_ids' => [$barber2->id, $this->barber->id],
+            'starts_at' => now()->addHours(2)->format('Y-m-d\TH:i:s'),
+            'source' => 'walk_in',
+        ])->json('id');
+
+        $this->postJson("/api/appointments/{$appointmentId}/complete");
+
+        // Cada barbeiro recebe a comissão DO SERVIÇO QUE ELE FEZ.
+        $this->assertEquals(
+            20.00,
+            (float) Commission::where('barber_id', $this->barber->id)->sum('amount'),
+            'Barbeiro 1 fez o Corte Simples (R$ 100 a 20%) e deve receber R$ 20.'
+        );
+        $this->assertEquals(
+            7.50,
+            (float) Commission::where('barber_id', $barber2->id)->sum('amount'),
+            'Barbeiro 2 fez a Barba (R$ 50 a 15%) e deve receber R$ 7,50.'
+        );
+    }
+
+    public function test_commission_amount_is_rounded_to_cents_in_storage(): void
+    {
+        $this->actingAs($this->owner);
+
+        // R$ 33,33 a 15% = 4,9995 — três casas. Dinheiro tem que ser gravado
+        // arredondado em centavos, senão a soma em SQL (relatórios, total a
+        // pagar) carrega a sobra e divergo entre SQLite e Postgres, que
+        // arredonda no decimal(10,2) por conta própria.
+        $serviceComQuebra = Service::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Quebra de centavo',
+            'duration_minutes' => 30,
+            'price' => 33.33,
+            'commission_percentage' => 15,
+        ]);
+
+        $appointmentId = $this->postJson('/api/appointments', [
+            'customer_id' => $this->customer->id,
+            'service_ids' => [$serviceComQuebra->id],
+            'barber_ids' => [$this->barber->id],
+            'starts_at' => now()->addHours(2)->format('Y-m-d\TH:i:s'),
+            'source' => 'walk_in',
+        ])->json('id');
+
+        $this->postJson("/api/appointments/{$appointmentId}/complete");
+
+        // Soma CRUA no banco (é o que os relatórios usam; ela não passa pelo cast).
+        $rawSum = (float) DB::table('commissions')
+            ->where('appointment_id', $appointmentId)
+            ->sum('amount');
+
+        $this->assertEquals(5.00, $rawSum, 'Comissão gravada com mais de 2 casas decimais.');
+    }
+
+    public function test_completing_twice_does_not_duplicate_commission_or_stats(): void
+    {
+        $this->actingAs($this->owner);
+
+        $appointmentId = $this->postJson('/api/appointments', [
+            'customer_id' => $this->customer->id,
+            'service_ids' => [$this->service->id],
+            'barber_ids' => [$this->barber->id],
+            'starts_at' => now()->addHours(2)->format('Y-m-d\TH:i:s'),
+            'source' => 'walk_in',
+        ])->json('id');
+
+        $this->postJson("/api/appointments/{$appointmentId}/complete")->assertOk();
+
+        // Segundo toque: dono no 3G aperta "Concluir" de novo porque a tela
+        // demorou. Não pode pagar o barbeiro duas vezes nem contar a visita
+        // duas vezes.
+        $this->postJson("/api/appointments/{$appointmentId}/complete");
+
+        $this->assertEquals(
+            1,
+            Commission::where('appointment_id', $appointmentId)->count(),
+            'Concluir duas vezes gerou comissão duplicada.'
+        );
+
+        $customer = $this->customer->fresh();
+        $this->assertEquals(1, $customer->total_visits, 'Visita contada duas vezes.');
+        $this->assertEquals(100.00, (float) $customer->total_spent, 'Faturamento do cliente dobrado.');
     }
 }

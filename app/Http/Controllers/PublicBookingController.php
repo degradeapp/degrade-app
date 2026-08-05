@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Link público de agendamento: /agendar/{slug}. SEM login. O cliente final
@@ -164,36 +165,60 @@ class PublicBookingController extends Controller
 
         $endsAt = $startsAt->copy()->addMinutes(Appointment::DEFAULT_BLOCK_MINUTES);
 
-        // Barbeiro escolhido (escopado por tenant) ou "qualquer um que esteja
-        // livre" no horário pedido.
-        $barber = $this->pickBarber($request->input('barber_id'), $startsAt, $endsAt);
-        if (! $barber) {
-            return response()->json(['message' => 'Este horário não está mais disponível. Escolha outro.'], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Cliente: casa pelo telefone DENTRO do tenant, ou cria. Atualiza o nome
-        // só se o registro existente nasceu sem nome real (ex.: bot do WhatsApp).
-        $phone = preg_replace('/\D/', '', (string) $request->input('phone'));
-        $customer = Customer::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'phone' => $phone],
-            ['name' => $request->input('name'), 'is_active' => true],
-        );
-        if ($customer->name === 'Cliente WhatsApp') {
-            $customer->update(['name' => $request->input('name')]);
-        }
-
         try {
-            $appointment = $action(
-                customerId: $customer->id,
-                serviceIds: $services->pluck('id')->all(),
-                startsAt: $startsAt,
-                source: AppointmentSource::customer,
-                barberIds: array_fill(0, $services->count(), $barber->id),
-                notes: 'Agendado pelo link público',
-            );
+            // Checar disponibilidade e só DEPOIS gravar abre uma janela de corrida
+            // (TOCTOU): dois clientes que mandam o mesmo horário ao mesmo tempo
+            // passam os dois pela checagem e o link público acaba encaixando —
+            // exatamente o que ele promete não fazer. A trava na linha do tenant
+            // serializa as criações públicas DESTA barbearia, então o segundo já
+            // enxerga o agendamento do primeiro ao re-checar.
+            //
+            // Não usamos exclusion constraint no banco (o padrão de mercado pra
+            // isso) de propósito: ela proibiria sobreposição SEMPRE, matando o
+            // encaixe do balcão, que é regra de negócio. O balcão não passa por
+            // aqui e continua livre pra encaixar.
+            $result = DB::transaction(function () use ($tenant, $request, $startsAt, $endsAt, $services, $action) {
+                Tenant::whereKey($tenant->id)->lockForUpdate()->first();
+
+                // Barbeiro escolhido (escopado por tenant) ou "qualquer um que
+                // esteja livre" no horário pedido.
+                $barber = $this->pickBarber($request->input('barber_id'), $startsAt, $endsAt);
+                if (! $barber) {
+                    return null;
+                }
+
+                // Cliente: casa pelo telefone DENTRO do tenant, ou cria. Atualiza o
+                // nome só se o registro existente nasceu sem nome real (ex.: bot do
+                // WhatsApp).
+                $phone = preg_replace('/\D/', '', (string) $request->input('phone'));
+                $customer = Customer::firstOrCreate(
+                    ['tenant_id' => $tenant->id, 'phone' => $phone],
+                    ['name' => $request->input('name'), 'is_active' => true],
+                );
+                if ($customer->name === 'Cliente WhatsApp') {
+                    $customer->update(['name' => $request->input('name')]);
+                }
+
+                $appointment = $action(
+                    customerId: $customer->id,
+                    serviceIds: $services->pluck('id')->all(),
+                    startsAt: $startsAt,
+                    source: AppointmentSource::customer,
+                    barberIds: array_fill(0, $services->count(), $barber->id),
+                    notes: 'Agendado pelo link público',
+                );
+
+                return [$appointment, $barber];
+            });
         } catch (\Exception $e) {
             return response()->json(['message' => 'Não foi possível concluir o agendamento. Tente novamente.'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        if ($result === null) {
+            return response()->json(['message' => 'Este horário não está mais disponível. Escolha outro.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        [$appointment, $barber] = $result;
 
         // Resposta mínima: confirmação pro cliente, sem expor estrutura interna.
         return response()->json([

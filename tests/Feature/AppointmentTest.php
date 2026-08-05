@@ -428,14 +428,20 @@ class AppointmentTest extends TestCase
 
         $response = $this->getJson("/api/appointments/availability/barber/{$this->barber->id}?date={$date}&duration_minutes=30");
 
-        $slots = collect($response->json('available_slots'))->filter(function ($slot) use ($startsAt) {
-            return Carbon::parse($slot['start_time'])->between(
-                $startsAt->copy()->subMinutes(30),
-                $startsAt->copy()->addMinutes(30)
-            );
+        // A invariante é: NENHUM slot oferecido pode se sobrepor ao agendamento
+        // que já existe. Sobreposição de intervalo semiaberto: começa antes do
+        // fim E termina depois do início. Slot que só ENCOSTA (termina 12:00
+        // quando o outro começa 12:00) é legítimo e continua na lista — checar
+        // isso com uma janela inclusiva de +-30min exigiria justamente o
+        // contrário e escondia um bug real no hasConflict.
+        $overlapping = collect($response->json('available_slots'))->filter(function ($slot) use ($startsAt, $endsAt) {
+            $slotStart = Carbon::parse($slot['start_time']);
+            $slotEnd = $slotStart->copy()->addMinutes(30);
+
+            return $slotStart < $endsAt && $slotEnd > $startsAt;
         });
 
-        $this->assertCount(0, $slots);
+        $this->assertCount(0, $overlapping, 'Slot oferecido se sobrepõe a um agendamento existente.');
     }
 
     public function test_day_schedule_returns_full_grid_with_occupied_slots(): void
@@ -519,5 +525,32 @@ class AppointmentTest extends TestCase
         $this->getJson("/api/appointments/availability/barber/{$this->barber->id}/day?date={$after}")
             ->assertStatus(200)
             ->assertJsonPath('works_today', true);
+    }
+
+    public function test_finished_states_are_final(): void
+    {
+        $this->actingAs($this->receptionist);
+
+        $payload = [
+            'customer_id' => $this->customer->id,
+            'service_ids' => [$this->service->id],
+            'barber_ids' => [$this->barber->id],
+            'starts_at' => now()->addHours(2)->format('Y-m-d\TH:i:s'),
+            'source' => 'walk_in',
+        ];
+
+        // Concluído não pode ser cancelado: a comissão já foi gerada e ficaria
+        // órfã, enquanto a receita sairia do relatório (que filtra completed).
+        $concluido = $this->postJson('/api/appointments', $payload)->json('id');
+        $this->postJson("/api/appointments/{$concluido}/complete")->assertOk();
+        $this->postJson("/api/appointments/{$concluido}/cancel")->assertUnprocessable();
+        $this->assertEquals('completed', Appointment::find($concluido)->status->value);
+
+        // Cancelado não pode ser concluído: geraria comissão de um atendimento
+        // que não aconteceu.
+        $cancelado = $this->postJson('/api/appointments', $payload)->json('id');
+        $this->postJson("/api/appointments/{$cancelado}/cancel")->assertOk();
+        $this->postJson("/api/appointments/{$cancelado}/complete")->assertUnprocessable();
+        $this->assertEquals('cancelled', Appointment::find($cancelado)->status->value);
     }
 }

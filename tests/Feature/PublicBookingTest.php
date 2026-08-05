@@ -227,3 +227,36 @@ it('no modo qualquer barbeiro escolhe um disponivel', function () {
     $response->assertCreated();
     expect(Appointment::withoutGlobalScopes()->latest('id')->first()->barber_id)->toBe($this->barber->id);
 });
+
+it('permite agendar encostado num agendamento existente (back-to-back)', function () {
+    // Existente 14:00-14:30. O slot 14:30 NÃO conflita, e o 13:30 também não:
+    // intervalo de horário é semiaberto (fim exclusivo). Encostar não é
+    // sobrepor — e back-to-back é o caso mais comum numa barbearia.
+    $startsAt = Carbon::now()->addDay()->setTime(14, 0);
+
+    DB::table('appointments')->insert([
+        'tenant_id' => $this->tenant->id,
+        'customer_id' => Customer::factory()->create(['tenant_id' => $this->tenant->id])->id,
+        'barber_id' => $this->barber->id,
+        'status' => 'scheduled',
+        'source' => 'walk_in',
+        'starts_at' => $startsAt,
+        'ends_at' => $startsAt->copy()->addMinutes(30),
+        'total_price' => 50,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $date = $startsAt->toDateString();
+    $slots = $this->getJson("/api/public/agendar/barbearia-teste/horarios?date={$date}&barber_id={$this->barber->id}")
+        ->assertOk()
+        ->json('data.slots');
+
+    expect($slots)->not->toContain('14:00')
+        ->and($slots)->toContain('14:30')
+        ->and($slots)->toContain('13:30');
+
+    $this->postJson('/api/public/agendar/barbearia-teste', ($this->validPayload)([
+        'starts_at' => $startsAt->copy()->addMinutes(30)->format('Y-m-d\TH:i:s'),
+    ]))->assertCreated();
+});

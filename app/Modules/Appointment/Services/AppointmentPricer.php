@@ -14,7 +14,10 @@ class AppointmentPricer
      */
     public function calculateTotal(Collection $services, array $priceOverrides = []): float
     {
-        return $services->sum(fn ($service) => $priceOverrides[$service->id] ?? $service->price);
+        // Arredonda em centavos: somar decimais em float pode sobrar resíduo
+        // binário (49.999999999999996) e o SQLite grava a sobra, ao contrário do
+        // Postgres. Mesma regra do CommissionService.
+        return round($services->sum(fn ($service) => (float) ($priceOverrides[$service->id] ?? $service->price)), 2);
     }
 
     /**
@@ -43,7 +46,7 @@ class AppointmentPricer
             $appointment->services()->create([
                 'service_id' => $service->id,
                 'barber_id' => $barberId,
-                'price_snapshot' => $priceOverrides[$service->id] ?? $service->price,
+                'price_snapshot' => round((float) ($priceOverrides[$service->id] ?? $service->price), 2),
                 'commission_percentage_snapshot' => $commissionPercentage,
             ]);
         }

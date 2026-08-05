@@ -64,6 +64,10 @@ class CommissionService
 
     public function calculateCommissionAmount($price, float $percentage): float
     {
-        return (float) ($price * $percentage / 100);
+        // Arredonda em centavos AQUI, não no banco. O Postgres arredonda sozinho
+        // ao gravar em decimal(10,2), mas o SQLite guarda a sobra (4,9995), e a
+        // soma em SQL — que relatórios e "total a pagar" usam, sem passar pelo
+        // cast decimal:2 — divergiria entre os dois bancos.
+        return round((float) $price * $percentage / 100, 2);
     }
 }

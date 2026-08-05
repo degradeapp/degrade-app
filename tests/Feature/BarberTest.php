@@ -570,4 +570,29 @@ class BarberTest extends TestCase
         // Sem horário de funcionamento definido → fallback Seg–Sáb (6 dias)
         $this->assertSame(6, Barber::find($response->json('id'))->schedules()->count());
     }
+
+    public function test_schedule_rejects_day_outside_the_week(): void
+    {
+        $this->actingAs($this->owner);
+
+        $barber = Barber::factory()->create(['tenant_id' => $this->tenant->id]);
+
+        // day_of_week válido é 0..6. Fora disso a linha nunca casa com dia nenhum:
+        // o barbeiro fica sem expediente naquele dia e ninguém entende por quê.
+        $this->putJson("/api/barbers/{$barber->id}/schedule/99", [
+            'start_time' => '09:00',
+            'end_time' => '18:00',
+        ])->assertNotFound();
+
+        $this->assertDatabaseMissing('barber_schedules', [
+            'barber_id' => $barber->id,
+            'day_of_week' => 99,
+        ]);
+
+        // Valor não numérico não pode virar erro 500.
+        $this->putJson("/api/barbers/{$barber->id}/schedule/abc", [
+            'start_time' => '09:00',
+            'end_time' => '18:00',
+        ])->assertNotFound();
+    }
 }

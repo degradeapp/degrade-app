@@ -8,7 +8,6 @@ use App\Events\AppointmentCreated;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Appointment\Services\AppointmentPricer;
 use App\Modules\Appointment\Services\AvailabilityService;
-use App\Modules\Appointment\Services\ConflictChecker;
 use App\Modules\Service\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +17,6 @@ readonly class CreateAppointment
 {
     public function __construct(
         private AvailabilityService $availabilityService,
-        private ConflictChecker $conflictChecker,
         private AppointmentPricer $pricer,
     ) {}
 
@@ -35,7 +33,15 @@ readonly class CreateAppointment
         $endsAt = $startsAt->copy()->addMinutes(Appointment::DEFAULT_BLOCK_MINUTES);
         $totalPrice = $this->pricer->calculateTotal($services, $priceOverrides);
 
-        $barberIds = $barberIds ?? array_fill(0, count($serviceIds), null);
+        // Barbeiros alinhados à ORDEM de $services (whereIn pode reordenar), mesma
+        // correção que UpdateAppointment já fazia. barber_ids chega POSICIONAL a
+        // service_ids; sem remapear por id, com 2+ serviços os barbeiros trocam de
+        // serviço e a comissão é gerada pra pessoa errada.
+        $requestedBarberByService = [];
+        foreach (array_values($serviceIds) as $i => $sid) {
+            $requestedBarberByService[(int) $sid] = ($barberIds ?? [])[$i] ?? null;
+        }
+        $barberIds = $services->map(fn ($s) => $requestedBarberByService[$s->id] ?? null)->toArray();
 
         // NÃO bloqueia por disponibilidade: numa barbearia o barbeiro decide o encaixe
         // e walk-in ("Atender agora") acontece a qualquer hora. A UI já avisa quando o

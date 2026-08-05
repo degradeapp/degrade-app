@@ -259,7 +259,11 @@ class AppointmentController extends Controller
     {
         $this->authorize('cancel', $appointment);
 
-        $updated = $action($appointment, auth()->id(), $request->input('reason'));
+        try {
+            $updated = $action($appointment, auth()->id(), $request->input('reason'));
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         return response()->json(new AppointmentResource($updated->load('services', 'customer', 'barber')));
     }
@@ -279,7 +283,11 @@ class AppointmentController extends Controller
     {
         $this->authorize('complete', $appointment);
 
-        $updated = $action($appointment, auth()->id());
+        try {
+            $updated = $action($appointment, auth()->id());
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         return response()->json(new AppointmentResource($updated->load('services', 'customer', 'barber')));
     }

@@ -160,14 +160,25 @@ class AvailabilityService
 
     private function hasConflict(Barber $barber, Carbon $startTime, Carbon $endTime): bool
     {
+        // Sobreposição de intervalos SEMIABERTOS: existente.inicio < novo.fim E
+        // existente.fim > novo.inicio. Encostar (fim == inicio) não é conflito,
+        // senão todo agendamento bloquearia os slots vizinhos e o back-to-back
+        // (o caso mais comum da barbearia) ficaria inagendável. É a mesma
+        // fórmula que getDaySchedule já usa em memória.
+        //
+        // ends_at é nullable: nesse caso vale starts_at + bloco padrão, mesma
+        // convenção do getDaySchedule. Como o limite é constante, ele é
+        // calculado aqui em PHP pra não precisar de data-math no SQL (que
+        // divergiria entre SQLite e Postgres).
+        $nullEndFloor = $startTime->copy()->subMinutes(Appointment::DEFAULT_BLOCK_MINUTES);
+
         return $barber->appointments()
             ->where('status', '!=', 'cancelled')
-            ->where(function ($q) use ($startTime, $endTime) {
-                $q->whereBetween('starts_at', [$startTime, $endTime])
-                    ->orWhereBetween('ends_at', [$startTime, $endTime])
-                    ->orWhere(function ($q2) use ($startTime, $endTime) {
-                        $q2->where('starts_at', '<', $startTime)
-                            ->where('ends_at', '>', $endTime);
+            ->where('starts_at', '<', $endTime)
+            ->where(function ($q) use ($startTime, $nullEndFloor) {
+                $q->where('ends_at', '>', $startTime)
+                    ->orWhere(function ($q2) use ($nullEndFloor) {
+                        $q2->whereNull('ends_at')->where('starts_at', '>', $nullEndFloor);
                     });
             })
             ->exists();

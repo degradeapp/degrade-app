@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AppointmentSource;
+use App\Enums\AppointmentStatus;
+use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Barber\Models\Barber;
+use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Whatsapp\Enums\WhatsappBotState;
@@ -55,6 +59,21 @@ class WhatsappBotTest extends TestCase
         $b1 = Barber::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Carlos', 'is_active' => true]);
         $b2 = Barber::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Pedro', 'is_active' => true]);
         $this->barberIds = [$b1->id, $b2->id];
+
+        // Expediente real 09:00-18:00 todos os dias, pros dois. O bot usa
+        // disponibilidade REAL (expediente + folga + conflito): sem expediente
+        // cadastrado não existe horário livre nenhum. Antes a grade do bot era
+        // fixa e ignorava isso, então estes testes passavam sem expediente.
+        foreach ([$b1, $b2] as $barber) {
+            foreach (range(0, 6) as $dow) {
+                $barber->schedules()->create([
+                    'tenant_id' => $this->tenant->id,
+                    'day_of_week' => $dow,
+                    'start_time' => '09:00',
+                    'end_time' => '18:00',
+                ]);
+            }
+        }
 
         $this->spy = new class extends WhatsappClient
         {
@@ -332,5 +351,32 @@ class WhatsappBotTest extends TestCase
         }
 
         $this->assertCount(15, $this->spy->sent);
+    }
+
+    public function test_bot_does_not_offer_an_occupied_slot(): void
+    {
+        // Carlos já tem atendimento hoje às 09:00, marcado no balcão.
+        Appointment::create([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => Customer::factory()->create(['tenant_id' => $this->tenant->id])->id,
+            'barber_id' => $this->barberIds[0],
+            'status' => AppointmentStatus::scheduled,
+            'source' => AppointmentSource::walk_in,
+            'starts_at' => Carbon::parse('2026-05-28 09:00'),
+            'ends_at' => Carbon::parse('2026-05-28 09:30'),
+            'total_price' => 50.00,
+        ]);
+
+        $this->send('oi');
+        $this->send('1'); // serviço
+        $this->send('1'); // barbeiro Carlos (o ocupado)
+        $this->send('1'); // hoje
+
+        $offered = $this->conversation()->session_data['slots_offered'];
+
+        // 09:00 está ocupado e sai da lista; 09:30 só encosta e continua livre.
+        $this->assertNotContains('09:00', $offered, 'Bot ofereceu horário ocupado.');
+        $this->assertContains('09:30', $offered, 'Bot perdeu o horário livre encostado.');
+        $this->assertStringNotContainsString('09:00', $this->lastReply());
     }
 }

@@ -4,6 +4,8 @@ namespace App\Modules\Whatsapp\Services;
 
 use App\Enums\AppointmentSource;
 use App\Modules\Appointment\Actions\CreateAppointment;
+use App\Modules\Appointment\Models\Appointment;
+use App\Modules\Appointment\Services\AvailabilityService;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Service\Models\Service;
@@ -19,6 +21,7 @@ class BotEngine
     public function __construct(
         private WhatsappClient $client,
         private CreateAppointment $createAppointment,
+        private AvailabilityService $availability,
     ) {}
 
     public function handleIncoming(Tenant $tenant, string $fromPhone, string $text): void
@@ -224,7 +227,7 @@ class BotEngine
         $conversation->state = WhatsappBotState::choosing_slot;
         $conversation->session_data = $session;
 
-        $slots = $this->availableSlots($conversation->tenant_id, $session);
+        $slots = $this->availableSlots($session);
 
         if (empty($slots)) {
             $conversation->state = WhatsappBotState::choosing_date;
@@ -292,22 +295,54 @@ class BotEngine
         return 'Tudo bem, cancelei. Digite "menu" para tentar de novo.';
     }
 
-    private function availableSlots(int $tenantId, array $session): array
+    /**
+     * Horários REALMENTE livres na data, iguais aos do link público: expediente
+     * do barbeiro + folga + conflito, e nunca no passado. O cliente final não
+     * encaixa (regra de produto: só o balcão encaixa).
+     *
+     * Antes esta função devolvia uma grade fixa 09:00-18:00 de 30 em 30 sem
+     * consultar NADA, então o bot oferecia horário ocupado, fora do expediente,
+     * em dia de folga e até já passado — e a criação não revalidava.
+     */
+    private function availableSlots(array $session): array
     {
-        $tz = config('app.timezone', 'America/Manaus');
-        $date = Carbon::parse($session['date'].' 09:00', $tz);
-        $end = Carbon::parse($session['date'].' 18:00', $tz);
-        $slots = [];
+        $date = Carbon::parse($session['date'])->startOfDay();
+        $now = Carbon::now();
 
-        while ($date->lessThan($end)) {
-            $slots[] = $date->format('H:i');
-            $date->addMinutes(30);
-            if (count($slots) >= 8) {
-                break;
+        $times = [];
+        foreach ($this->bookableBarbers($this->sessionBarberId($session)) as $barber) {
+            foreach ($this->availability->getAvailableSlots($barber, $date->copy(), Appointment::DEFAULT_BLOCK_MINUTES) as $slot) {
+                $start = Carbon::parse($slot['start_time']);
+                if ($start->lte($now)) {
+                    continue;
+                }
+                $times[$start->format('H:i')] = true;
             }
         }
 
-        return $slots;
+        $times = array_keys($times);
+        sort($times);
+
+        // O WhatsApp é conversa: lista longa não se lê. 8 é o teto da mensagem.
+        return array_slice($times, 0, 8);
+    }
+
+    /** Barbeiro escolhido na conversa, ou null para "qualquer um". */
+    private function sessionBarberId(array $session): ?int
+    {
+        return isset($session['barber_id']) ? (int) $session['barber_id'] : null;
+    }
+
+    /** Barbeiros agendáveis do tenant: o escolhido (se ativo) ou todos os ativos. */
+    private function bookableBarbers(?int $barberId)
+    {
+        $query = Barber::where('is_active', true);
+
+        if ($barberId) {
+            $query->where('id', $barberId);
+        }
+
+        return $query->orderBy('name')->get();
     }
 
     private function createAppointmentFromSession(WhatsappConversation $conversation, array $session): ?int
@@ -318,8 +353,35 @@ class BotEngine
         );
         $conversation->customer_id = $customer->id;
 
+        // TenantContext::set já pôs a request no fuso da loja, então config()
+        // aqui devolve o fuso do tenant, não o do app.
         $tz = config('app.timezone', 'America/Manaus');
         $startsAt = Carbon::parse($session['date'].' '.$session['slot'], $tz);
+        $endsAt = $startsAt->copy()->addMinutes(Appointment::DEFAULT_BLOCK_MINUTES);
+
+        // Revalida na hora de gravar: entre a oferta e o "SIM" o horário pode ter
+        // sido tomado no balcão. Devolver null aqui faz a mensagem de "horário
+        // pode ter ficado indisponível" (que já existia no stepConfirming) virar
+        // verdade em vez de promessa vazia.
+        if ($startsAt->lte(Carbon::now())) {
+            return null;
+        }
+
+        $barber = null;
+        foreach ($this->bookableBarbers($this->sessionBarberId($session)) as $candidate) {
+            if ($this->availability->isAvailable($candidate, $startsAt->copy(), $endsAt->copy())) {
+                $barber = $candidate;
+                break;
+            }
+        }
+
+        // Sem barbeiro livre não grava. Além de respeitar a regra, isso garante
+        // que todo agendamento do bot nasce COM barbeiro: sem ele a conclusão
+        // não gera comissão (GenerateCommission ignora barber_id nulo) e a loja
+        // não sabe quem atende.
+        if (! $barber) {
+            return null;
+        }
 
         try {
             $appointment = ($this->createAppointment)(
@@ -327,7 +389,7 @@ class BotEngine
                 serviceIds: [(int) $session['service_id']],
                 startsAt: $startsAt,
                 source: AppointmentSource::whatsapp,
-                barberIds: isset($session['barber_id']) ? [(int) $session['barber_id']] : null,
+                barberIds: [$barber->id],
                 notes: 'Agendado pelo WhatsApp Bot',
             );
 

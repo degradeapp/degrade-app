@@ -26,10 +26,13 @@ class SendNotification
         $settings = NotificationSetting::firstWhere('tenant_id', $tenant->id);
 
         if ($settings) {
+            // Cada evento lê a SUA chave. Remarcação usava 'appointment_confirmed':
+            // o toggle "Agendamento remarcado" da tela não surtia efeito nenhum, e
+            // desligar "confirmado" calava a remarcação junto, sem o dono entender.
             $eventKey = match (true) {
                 $event instanceof AppointmentCompleted => 'appointment_confirmed',
                 $event instanceof AppointmentCancelled => 'appointment_cancelled',
-                $event instanceof AppointmentRescheduled => 'appointment_confirmed',
+                $event instanceof AppointmentRescheduled => 'appointment_rescheduled',
             };
 
             if (! ($settings->{$eventKey} ?? true)) {

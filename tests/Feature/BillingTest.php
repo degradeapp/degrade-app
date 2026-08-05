@@ -350,4 +350,24 @@ class BillingTest extends TestCase
         $tenant = Tenant::find($this->tenant->id);
         $this->assertEquals('cancelled', $tenant->status);
     }
+
+    public function test_changing_plan_cancels_the_previous_subscription_at_asaas(): void
+    {
+        $this->actingAs($this->owner);
+
+        $this->postJson('/api/billing/select-plan', ['plan' => 'solo'])->assertCreated();
+        $primeira = $this->tenant->fresh()->asaas_subscription_id;
+        $this->assertNotNull($primeira);
+
+        // Upgrade legitimo (ou segundo clique no botao "Assinar").
+        $this->postJson('/api/billing/select-plan', ['plan' => 'barbearia'])->assertCreated();
+
+        // A assinatura ANTIGA tem que ser removida no Asaas antes de criar a nova.
+        // Sem isso ela continua cobrando la, invisivel pro app (porque o
+        // asaas_subscription_id e sobrescrito), e o cliente paga os DOIS planos no
+        // mesmo mes. O DELETE vai pra /subscriptions/{id}, que nao casa com o
+        // padrao '*/subscriptions' do fake e cai no catch-all.
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+            && str_contains($request->url(), '/subscriptions/'.$primeira));
+    }
 }

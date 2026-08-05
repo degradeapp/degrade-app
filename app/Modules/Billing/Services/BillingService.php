@@ -122,6 +122,18 @@ class BillingService
         ]);
     }
 
+    /**
+     * Remove a assinatura no Asaas SEM tocar no status do tenant. É o que a troca
+     * de plano precisa: cancelSubscription() marca o tenant como 'cancelled', o que
+     * estaria errado no meio de um upgrade.
+     */
+    public function deleteRemoteSubscription(string $subscriptionId): void
+    {
+        Http::withHeaders(['access_token' => $this->apiKey])
+            ->delete($this->baseUrl.'/subscriptions/'.$subscriptionId)
+            ->throw();
+    }
+
     public function cancelSubscription(Tenant $tenant): void
     {
         try {
@@ -129,9 +141,7 @@ class BillingService
                 throw new \Exception('No subscription ID found for tenant');
             }
 
-            Http::withHeaders(['access_token' => $this->apiKey])
-                ->delete($this->baseUrl.'/subscriptions/'.$tenant->asaas_subscription_id)
-                ->throw();
+            $this->deleteRemoteSubscription($tenant->asaas_subscription_id);
 
             $tenant->update(['status' => 'cancelled']);
 

@@ -35,6 +35,18 @@ class BillingController extends Controller
                 $tenant->update(['asaas_customer_id' => $customerId]);
             }
 
+            // Troca de plano ou segundo clique no botão: cancela a assinatura
+            // anterior no Asaas ANTES de criar a nova. Sem isso as duas ficam
+            // ativas lá e o cliente é cobrado nos dois planos no mesmo mês — e a
+            // antiga fica invisível pro app, porque o asaas_subscription_id é
+            // sobrescrito abaixo. Limpa o id junto: se a criação da nova falhar,
+            // o dono fica sem assinatura (recuperável, ele tenta de novo) em vez
+            // de apontando pra uma que já não existe.
+            if ($tenant->asaas_subscription_id) {
+                $this->billingService->deleteRemoteSubscription($tenant->asaas_subscription_id);
+                $tenant->update(['asaas_subscription_id' => null]);
+            }
+
             $subscription = $this->billingService->createSubscription($tenant, $plan);
 
             // SEGURANÇA: nunca ativar com base na seleção do plano (frontend).

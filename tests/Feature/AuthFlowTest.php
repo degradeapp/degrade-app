@@ -111,4 +111,34 @@ class AuthFlowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->component('Appointments/Index'));
     }
+
+    public function test_soft_deleted_tenant_does_not_crash_a_live_session(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Barbearia Excluida',
+            'slug' => 'barbearia-excluida',
+            'status' => 'active',
+            'onboarding_completed_at' => now(),
+        ]);
+
+        $owner = User::create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Dono',
+            'email' => 'dono-excluido@test.local',
+            'password' => 'password',
+            'role' => 'owner',
+        ]);
+
+        // A barbearia foi excluida (soft-delete) enquanto esta sessao seguia viva.
+        // A relacao belongsTo respeita o SoftDeletingScope, entao user->tenant
+        // vira null e o middleware nao pode desreferenciar null.
+        $tenant->delete();
+
+        // 404 limpo, nunca 500: o EnsureTenantContext e global no grupo web e faz
+        // Tenant::findOrFail(), que respeita o SoftDeletingScope e aborta ANTES do
+        // EnsureOnboardingCompleted (que le $tenant->onboarding_completed_at sem
+        // checar null). Este teste trava essa ORDEM: mover o EnsureTenantContext
+        // pra depois, ou tirar ele do grupo, transforma isto num 500.
+        $this->actingAs($owner)->get('/')->assertNotFound();
+    }
 }

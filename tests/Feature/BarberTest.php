@@ -595,4 +595,38 @@ class BarberTest extends TestCase
             'end_time' => '18:00',
         ])->assertNotFound();
     }
+
+    public function test_reactivating_a_barber_respects_the_plan_limit(): void
+    {
+        $this->actingAs($this->owner);
+        $this->tenant->update(['plan' => 'barbearia']); // teto 10
+
+        // 3 usuarios do setUp + 7 barbeiros sem login = 10 pessoas, NO limite.
+        Barber::factory()->count(7)->create([
+            'tenant_id' => $this->tenant->id,
+            'user_id' => null,
+            'is_active' => true,
+        ]);
+
+        // Barbeiro inativo NAO entra no staffCount (ele filtra is_active).
+        $inativo = Barber::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'user_id' => null,
+            'is_active' => false,
+            'phone' => '92991110000',
+        ]);
+
+        $this->assertSame(10, $this->tenant->fresh()->staffCount());
+
+        // Reativar consome vaga e levaria a 11. Sem guarda no update, isso fura o
+        // teto do plano: desativa um, cria outro, reativa o primeiro, repete.
+        $this->putJson("/api/barbers/{$inativo->id}", [
+            'name' => $inativo->name,
+            'phone' => '92991110000',
+            'is_active' => true,
+        ])->assertForbidden();
+
+        $this->assertFalse((bool) $inativo->fresh()->is_active);
+        $this->assertSame(10, $this->tenant->fresh()->staffCount());
+    }
 }

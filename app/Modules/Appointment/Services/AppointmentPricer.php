@@ -73,9 +73,9 @@ class AppointmentPricer
         }
 
         // 4) Padrão financeiro do tenant.
-        $tenant = app('tenant');
-        $settings = is_string($tenant->settings ?? null) ? json_decode($tenant->settings, true) : ($tenant->settings ?? []);
-        $tenantDefault = data_get($settings, 'financial.default_commission_percentage');
+        // settings tem cast 'array' no Tenant, então o helper setting() já resolve
+        // o caminho aninhado. Não precisa de json_decode na mão.
+        $tenantDefault = app('tenant')->setting('financial.default_commission_percentage');
 
         return $tenantDefault !== null ? (float) $tenantDefault : null;
     }

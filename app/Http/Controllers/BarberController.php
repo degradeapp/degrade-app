@@ -112,6 +112,22 @@ class BarberController extends Controller
     {
         $this->authorize('update', $barber);
 
+        // Reativar CONSOME vaga do plano: staffCount() só conta barbeiro ativo.
+        // Sem esta guarda o teto era furável em ciclo — desativa um, cria outro
+        // no lugar, reativa o primeiro, repete. Só barbeiro SEM login entra na
+        // conta por aqui; com login ele já é contado como usuário.
+        $tenant = app('tenant');
+        $reativando = $request->has('is_active')
+            && $request->boolean('is_active')
+            && ! $barber->is_active
+            && $barber->user_id === null;
+
+        if ($reativando && ! $tenant->canAddBarber()) {
+            return response()->json([
+                'message' => "Seu plano permite até {$tenant->effectiveStaffLimit()} funcionários (incluindo você). Faça upgrade para reativar este profissional.",
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $updated = $action(
             barber: $barber,
             name: $request->input('name'),

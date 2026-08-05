@@ -103,19 +103,4 @@ class Appointment extends Model
 
         return $this->status;
     }
-
-    public function scopeActive($query)
-    {
-        return $query->whereIn('status', ['scheduled', 'completed']);
-    }
-
-    public function scopeUpcoming($query)
-    {
-        return $query->where('status', 'scheduled')->where('starts_at', '>=', now());
-    }
-
-    public function scopeCompleted($query)
-    {
-        return $query->where('status', 'completed');
-    }
 }

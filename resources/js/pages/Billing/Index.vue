@@ -33,6 +33,36 @@
         </div>
       </div>
 
+      <!-- Fatura em aberto: link do Asaas (Pix, boleto ou cartão) -->
+      <a
+        v-if="info.payment_url && info.status !== 'cancelled'"
+        :href="info.payment_url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center justify-center gap-2 w-full h-12 rounded-[10px] bg-[#FFD60A] text-[#0A0A0A] text-[15px] font-bold hover:bg-[#FFE066] transition-colors"
+      >
+        <ExternalLink :size="16" :stroke-width="2.5" />
+        Pagar fatura
+      </a>
+
+      <!-- Titular da assinatura: o Asaas exige CPF/CNPJ válido -->
+      <div class="bg-[#131313] border border-[#2A2A2A] rounded-[14px] p-4">
+        <p class="text-[10px] uppercase tracking-[0.08em] text-[#6B6B6B] mb-3">Titular da assinatura</p>
+        <div v-if="info.billing_document_hint && !editingDocument" class="flex items-center justify-between gap-3">
+          <p class="text-[14px] text-white tabular-nums">CPF/CNPJ {{ info.billing_document_hint }}</p>
+          <button type="button" class="text-[13px] text-[#FFD60A]" @click="editingDocument = true">Alterar</button>
+        </div>
+        <FormField
+          v-else
+          id="billing-document"
+          v-model="documentInput"
+          label="CPF ou CNPJ"
+          :error="documentError"
+          :maxlength="18"
+          autocomplete="off"
+        />
+      </div>
+
       <!-- Planos -->
       <p class="text-[12px] text-[#6B6B6B] uppercase tracking-[0.08em] pt-2">Escolha seu plano</p>
 
@@ -108,8 +138,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Check, Loader2 } from 'lucide-vue-next'
+import { Check, ExternalLink, Loader2 } from 'lucide-vue-next'
 import AppLayout from '../../layouts/AppLayout.vue'
+import FormField from '../../components/FormField.vue'
 import Skeleton from '../../components/Skeleton.vue'
 import { useConfirm } from '../../composables/useConfirm'
 import { useToast } from '../../composables/useToast'
@@ -124,6 +155,8 @@ interface BillingInfo {
   staff_limit?: number
   staff_count?: number
   asaas_subscription_id?: string | null
+  payment_url?: string | null
+  billing_document_hint?: string | null
 }
 
 const { ask } = useConfirm()
@@ -133,6 +166,9 @@ const loading = ref(true)
 const selecting = ref<string | null>(null)
 const cancelling = ref(false)
 const generalError = ref('')
+const documentInput = ref('')
+const documentError = ref('')
+const editingDocument = ref(false)
 
 // Só faz sentido cancelar se existe assinatura e ela ainda não foi cancelada.
 const canCancel = computed(
@@ -225,6 +261,12 @@ onMounted(async () => {
 
 const selectPlan = async (planId: string) => {
   generalError.value = ''
+  documentError.value = ''
+  const needsDocument = !info.value.billing_document_hint || editingDocument.value
+  if (needsDocument && !documentInput.value.trim()) {
+    documentError.value = 'Informe o CPF ou CNPJ do titular.'
+    return
+  }
   selecting.value = planId
   try {
     const res = await fetch('/api/billing/select-plan', {
@@ -236,15 +278,18 @@ const selectPlan = async (planId: string) => {
         'X-Requested-With': 'XMLHttpRequest',
         'X-XSRF-TOKEN': xsrf(),
       },
-      body: JSON.stringify({ plan: planId }),
+      body: JSON.stringify(needsDocument ? { plan: planId, document: documentInput.value } : { plan: planId }),
     })
     if (res.ok) {
       const json = await res.json()
       const data = json.data ?? json
       info.value = { ...info.value, ...data, plan: data.current_plan ?? data.plan ?? null }
+      editingDocument.value = false
+      documentInput.value = ''
     } else {
       const b = await res.json().catch(() => ({}))
-      generalError.value = b.message ?? `Erro ${res.status}.`
+      if (b.errors?.document) documentError.value = b.errors.document[0]
+      else generalError.value = b.message ?? `Erro ${res.status}.`
     }
   } finally {
     selecting.value = null

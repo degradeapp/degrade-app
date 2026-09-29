@@ -20,6 +20,10 @@ class BillingResource extends JsonResource
             'status' => $this->status,
             'trial_ends_at' => $this->status === 'trial' ? $this->trial_ends_at?->toIso8601String() : null,
             'asaas_subscription_id' => $this->asaas_subscription_id,
+            'payment_url' => $this->payment_url,
+            'next_due_date' => $this->next_due_date?->toDateString(),
+            // Só os 4 últimos: o documento completo nunca volta pro navegador.
+            'billing_document_hint' => $this->billing_document ? '••• '.substr($this->billing_document, -4) : null,
             'available_plans' => $this->getAvailablePlans(),
         ];
     }

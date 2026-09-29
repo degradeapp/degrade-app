@@ -33,7 +33,13 @@ class Tenant extends Model
         'settings',
         'onboarding_completed_at',
         'purge_scheduled_at',
+        'billing_document',
+        'payment_url',
+        'next_due_date',
     ];
+
+    // CPF/CNPJ do titular: dado pessoal (LGPD). Nunca sai em serialização.
+    protected $hidden = ['billing_document'];
 
     public function logoUrl(): ?string
     {
@@ -45,6 +51,8 @@ class Tenant extends Model
         'trial_ends_at' => 'datetime',
         'onboarding_completed_at' => 'datetime',
         'purge_scheduled_at' => 'datetime',
+        'billing_document' => 'encrypted',
+        'next_due_date' => 'date',
     ];
 
     public function users()

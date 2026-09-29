@@ -6,9 +6,12 @@ use App\Enums\BillingPlan;
 use App\Events\SubscriptionCreated;
 use App\Http\Requests\SelectPlanRequest;
 use App\Http\Resources\BillingResource;
+use App\Modules\Billing\Services\AsaasException;
 use App\Modules\Billing\Services\BillingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class BillingController extends Controller
 {
@@ -27,49 +30,70 @@ class BillingController extends Controller
 
         $this->authorize('selectPlan', $tenant);
 
+        $plan = BillingPlan::from($request->input('plan'));
+
+        // Downgrade não pode deixar a barbearia acima do teto do novo plano (o teto é
+        // o ÚNICO diferencial entre Solo e Barbearia).
+        if ($tenant->staffCount() > $plan->staffLimit()) {
+            return response()->json([
+                'message' => "O plano {$plan->label()} permite até {$plan->staffLimit()} profissional(is). Desative quem não usa mais antes de trocar.",
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Toque duplo no 3G / duas abas: sem a trava, dois requests criam duas
+        // assinaturas no Asaas antes de qualquer um gravar o id.
+        $lock = Cache::lock('billing:select-plan:'.$tenant->id, 30);
+        if (! $lock->get()) {
+            return response()->json(['message' => 'Já estamos processando sua assinatura. Aguarde um instante.'], Response::HTTP_CONFLICT);
+        }
+
         try {
-            $plan = BillingPlan::from($request->input('plan'));
+            $documentChanged = $request->filled('document') && $request->input('document') !== $tenant->billing_document;
+            if ($documentChanged) {
+                $tenant->update(['billing_document' => $request->input('document')]);
+            }
 
             if (! $tenant->asaas_customer_id) {
-                $customerId = $this->billingService->createCustomer($tenant);
-                $tenant->update(['asaas_customer_id' => $customerId]);
+                $tenant->update(['asaas_customer_id' => $this->billingService->createCustomer($tenant)]);
+            } elseif ($documentChanged) {
+                $this->billingService->updateCustomerDocument($tenant);
             }
 
-            // Troca de plano ou segundo clique no botão: cancela a assinatura
-            // anterior no Asaas ANTES de criar a nova. Sem isso as duas ficam
-            // ativas lá e o cliente é cobrado nos dois planos no mesmo mês — e a
-            // antiga fica invisível pro app, porque o asaas_subscription_id é
-            // sobrescrito abaixo. Limpa o id junto: se a criação da nova falhar,
-            // o dono fica sem assinatura (recuperável, ele tenta de novo) em vez
-            // de apontando pra uma que já não existe.
             if ($tenant->asaas_subscription_id) {
-                $this->billingService->deleteRemoteSubscription($tenant->asaas_subscription_id);
-                $tenant->update(['asaas_subscription_id' => null]);
+                // Mesma assinatura, só muda o valor (ver changeSubscriptionPlan).
+                $this->billingService->changeSubscriptionPlan($tenant, $plan);
+                $tenant->update(['plan' => $plan->value]);
+            } else {
+                $subscription = $this->billingService->createSubscription($tenant, $plan);
+
+                // SEGURANÇA: nunca ativar a partir da seleção do plano. O webhook de
+                // pagamento confirmado é a ÚNICA fonte de verdade pra status=active.
+                $tenant->update([
+                    'plan' => $plan->value,
+                    'asaas_subscription_id' => $subscription['id'],
+                    'next_due_date' => $subscription['next_due_date'],
+                ]);
+
+                SubscriptionCreated::dispatch($tenant, $plan);
             }
 
-            $subscription = $this->billingService->createSubscription($tenant, $plan);
+            $this->refreshOpenInvoice($tenant);
 
-            // SEGURANÇA: nunca ativar com base na seleção do plano (frontend).
-            // O webhook subscription.payment_received do Asaas é a ÚNICA fonte de
-            // verdade para status=active. Aqui só registramos o plano escolhido e a
-            // assinatura criada (pagamento ainda PENDENTE). O tenant mantém o status
-            // atual (trial) até o pagamento ser confirmado pelo webhook.
-            $tenant->update([
-                'plan' => $plan->value,
-                'asaas_subscription_id' => $subscription['id'] ?? null,
-            ]);
-
-            SubscriptionCreated::dispatch($tenant, $plan);
-
+            return response()->json(['data' => new BillingResource($tenant->fresh())], Response::HTTP_CREATED);
+        } catch (AsaasException $e) {
             return response()->json(
-                ['data' => new BillingResource($tenant)],
-                Response::HTTP_CREATED
-            );
-        } catch (\Exception $e) {
-            return response()->json(
-                ['message' => 'Erro ao processar pagamento. Tente novamente.'],
+                ['message' => $e->asaasMessage ?? 'Erro ao processar a assinatura. Tente novamente.'],
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(
+                ['message' => 'Erro ao processar a assinatura. Tente novamente.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        } finally {
+            $lock->release();
         }
     }
 
@@ -92,11 +116,30 @@ class BillingController extends Controller
             $this->billingService->cancelSubscription($tenant);
 
             return response()->json(['data' => new BillingResource($tenant->fresh())]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return response()->json(
                 ['message' => 'Não foi possível cancelar agora. Tente novamente.'],
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
+        }
+    }
+
+    /**
+     * Link da fatura em aberto pra tela mostrar "Pagar agora". Best-effort: a
+     * assinatura já existe; se a consulta falhar, o webhook PAYMENT_CREATED traz o link.
+     */
+    private function refreshOpenInvoice($tenant): void
+    {
+        try {
+            $invoice = $this->billingService->openInvoice($tenant);
+            $tenant->update([
+                'payment_url' => $invoice['url'],
+                'next_due_date' => $invoice['due_date'] ?? $tenant->next_due_date,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Asaas: não foi possível buscar a fatura em aberto', ['tenant_id' => $tenant->id]);
         }
     }
 }

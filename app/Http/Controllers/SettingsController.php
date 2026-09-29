@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ManagesImageUploads;
 use App\Modules\Billing\Services\BillingService;
 use App\Modules\Tenant\Models\Tenant;
+use App\Modules\Tenant\Services\TenantSlug;
 use App\Modules\User\Models\User;
 use App\Rules\BrazilianPhone;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +30,7 @@ class SettingsController extends Controller
         return response()->json([
             'data' => [
                 'name' => $tenant->name,
+                'slug' => $tenant->slug,
                 'logo_url' => $tenant->logoUrl(),
                 'timezone' => data_get($settings, 'timezone', 'America/Manaus'),
                 'cancellation_policy_hours' => data_get($settings, 'cancellation_policy_hours', 24),
@@ -40,18 +42,47 @@ class SettingsController extends Controller
 
     public function updateTenantSettings(Request $request): JsonResponse
     {
+        $tenant = app('tenant');
+
+        if ($request->filled('slug')) {
+            $request->merge(['slug' => Str::lower(trim((string) $request->input('slug')))]);
+        }
+
         $request->validate([
             'name' => 'sometimes|string|min:2|max:100',
             'timezone' => 'sometimes|string|max:60',
             'cancellation_policy_hours' => 'sometimes|integer|min:0|max:168',
             'default_commission_percentage' => 'sometimes|numeric|min:0|max:100',
+            // Endereço do link público. Único entre TODAS as barbearias (inclusive conta
+            // excluída na janela de 30 dias, que ainda pode ser recuperada).
+            'slug' => [
+                'sometimes', 'string', 'min:'.TenantSlug::MIN, 'max:'.TenantSlug::MAX, 'regex:'.TenantSlug::PATTERN,
+                function (string $attr, mixed $value, \Closure $fail) use ($tenant) {
+                    if (TenantSlug::isReserved($value)) {
+                        $fail('Este endereço é reservado. Escolha outro.');
+                    } elseif (TenantSlug::taken($value, $tenant->id)) {
+                        $fail('Este endereço já está em uso por outra barbearia.');
+                    }
+                },
+            ],
+        ], [
+            'slug.regex' => 'Use só letras minúsculas, números e hífen (ex.: barbearia-do-joao).',
+            'slug.min' => 'O endereço precisa ter pelo menos '.TenantSlug::MIN.' caracteres.',
+            'slug.max' => 'O endereço pode ter no máximo '.TenantSlug::MAX.' caracteres.',
         ]);
 
-        $tenant = app('tenant');
+        // Trocar o endereço quebra o link antigo (bio, QR impresso): só o dono.
+        if ($request->has('slug') && $request->input('slug') !== $tenant->slug && ! auth()->user()->isOwner()) {
+            abort(403, 'Só o dono pode alterar o endereço do link de agendamento.');
+        }
+
         $settings = $this->parseSettings($tenant);
 
         if ($request->has('name')) {
             $tenant->name = $request->input('name');
+        }
+        if ($request->has('slug')) {
+            $tenant->slug = $request->input('slug');
         }
         if ($request->has('timezone')) {
             $settings['timezone'] = $request->input('timezone');

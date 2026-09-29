@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Modules\Service\Models\Service;
+use App\Modules\Tenant\Services\TenantSlug;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,14 @@ class OnboardingController extends Controller
         $settings = $this->parseSettings($tenant);
         $tenant->name = $request->input('name');
         $settings['timezone'] = $request->input('timezone');
+
+        // O link público nasce aleatório no cadastro (barbearia-xxxxxxxx); aqui ele vira
+        // o nome da barbearia (/agendar/barbearia-do-joao). Enquanto o onboarding não
+        // termina, acompanha o nome se o dono voltar e corrigir; depois disso, só muda
+        // pelas configurações (o link já pode estar impresso num QR).
+        if (TenantSlug::isPlaceholder($tenant->slug) || ! $tenant->onboarding_completed_at) {
+            $tenant->slug = TenantSlug::fromName($tenant->name, $tenant->id);
+        }
         $tenant->settings = $settings;
         $tenant->save();
 

@@ -147,8 +147,7 @@
         </div>
         <h2 class="text-[22px] font-bold text-white">Tudo pronto!</h2>
         <p class="text-[13px] text-[#A1A1A1] leading-relaxed">
-          Sua barbearia está configurada. Você pode começar a aceitar agendamentos agora.
-          O WhatsApp Bot pode ser ativado depois em Configurações.
+          Sua barbearia está configurada. Compartilhe seu link de agendamento e comece a receber clientes agora.
         </p>
       </section>
     </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
-import { ChevronLeft, Check, Loader2, Scissors, Store } from 'lucide-vue-next'
+import { ChevronLeft, Check, Loader2, Scissors, Store, CalendarPlus } from 'lucide-vue-next'
 import { useFormatting } from '@/composables/useFormatting'
 
 interface CatalogService { id: number; name: string; price: number }
@@ -16,6 +16,7 @@ interface Catalog {
 interface Confirmation {
   id: number
   starts_at: string | null
+  ends_at: string | null
   barber_name: string
   services: string[]
   total_price: number
@@ -251,6 +252,24 @@ const submit = async () => {
     submitting.value = false
   }
 }
+
+// "Salvar na minha agenda": o celular do cliente lembra dele do horário (Google
+// Agenda abre no Android e no navegador). Datas em UTC no formato do Google.
+const calendarUrl = computed(() => {
+  const c = confirmation.value
+  if (!c?.starts_at || !catalog.value) return null
+  const start = new Date(c.starts_at)
+  const end = c.ends_at ? new Date(c.ends_at) : new Date(start.getTime() + 30 * 60000)
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${c.services.join(', ')} · ${catalog.value.name}`,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: `Com ${c.barber_name}`,
+    location: catalog.value.name,
+  })
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+})
 
 const confirmationDate = computed(() => {
   if (!confirmation.value?.starts_at) return ''
@@ -510,6 +529,12 @@ onMounted(loadCatalog)
               Celular com DDD
             </label>
           </div>
+
+          <!-- LGPD: transparência sobre o uso do nome/celular (art. 9º) -->
+          <p class="text-[11px] text-[#6B6B6B] leading-relaxed px-1">
+            Seu nome e celular são usados só por {{ catalog.name }} para organizar seu horário.
+            <a href="/privacy" target="_blank" rel="noopener" class="underline underline-offset-2 text-[#A1A1A1]">Privacidade</a>
+          </p>
         </section>
       </main>
 
@@ -555,9 +580,22 @@ onMounted(loadCatalog)
           {{ confirmation.services.join(', ') }} com {{ confirmation.barber_name }}
         </p>
         <p class="text-[15px] font-medium text-white mt-1">{{ confirmationDate }}</p>
-        <p class="text-[13px] text-[#6B6B6B] mt-6 max-w-[300px] leading-relaxed">
-          Guarde a data. Em caso de imprevisto, fale com a barbearia.
+        <a
+          v-if="calendarUrl"
+          :href="calendarUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-7 h-12 px-6 rounded-[10px] border border-[#2A2A2A] text-[14px] font-semibold text-white flex items-center gap-2 hover:border-[#FFD60A] transition-colors"
+        >
+          <CalendarPlus :size="18" :stroke-width="2" class="text-[#FFD60A]" />
+          Salvar na minha agenda
+        </a>
+        <p class="text-[13px] text-[#6B6B6B] mt-5 max-w-[300px] leading-relaxed">
+          Em caso de imprevisto, fale com a barbearia.
         </p>
+        <a href="/" class="absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] text-[11px] text-[#6B6B6B] hover:text-[#A1A1A1] transition-colors">
+          Agendamento por <span class="font-semibold text-[#A1A1A1]">Degradê</span>
+        </a>
       </div>
     </Transition>
   </div>

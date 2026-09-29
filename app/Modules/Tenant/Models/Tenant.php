@@ -95,6 +95,18 @@ class Tenant extends Model
         return $this->status === 'cancelled';
     }
 
+    /**
+     * Acesso às telas pagas: assinatura ativa, trial valendo, ou cancelada mas ainda
+     * dentro do período já pago (os Termos prometem acesso até o fim do ciclo; cortar
+     * no ato do cancelamento tiraria dias que o cliente pagou).
+     */
+    public function hasAccess(): bool
+    {
+        return $this->isActive()
+            || $this->isTrialing()
+            || ($this->isCancelled() && $this->next_due_date?->endOfDay()->isFuture());
+    }
+
     public function setting(string $key, mixed $default = null): mixed
     {
         return data_get($this->settings, $key, $default);

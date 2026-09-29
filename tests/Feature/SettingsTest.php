@@ -307,6 +307,7 @@ class SettingsTest extends TestCase
             'phone' => '92988887777',
             'password' => 'password123',
             'password_confirmation' => 'password123',
+            'terms' => true,
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('email');

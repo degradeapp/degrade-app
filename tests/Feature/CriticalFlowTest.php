@@ -30,6 +30,7 @@ class CriticalFlowTest extends TestCase
             'phone' => '92991234567',
             'password' => 'password123',
             'password_confirmation' => 'password123',
+            'terms' => true,
         ])->assertStatus(201);
 
         $owner = User::where('email', 'dono@degrade.test')->firstOrFail();

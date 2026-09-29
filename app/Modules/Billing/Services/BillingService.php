@@ -186,11 +186,14 @@ class BillingService
 
         // Limpa o id: uma nova assinatura depois do cancelamento cria outra do zero, e o
         // webhook SUBSCRIPTION_DELETED desta aqui passa a ser reconhecido como antigo.
+        // Quem estava ATIVO mantém o next_due_date: ele marca o fim do período já pago,
+        // e o acesso segue até lá (Tenant::hasAccess, Termos §4). Quem não pagou nada
+        // (trial, vencido) não tem período pago a preservar.
         $tenant->update([
             'status' => 'cancelled',
             'asaas_subscription_id' => null,
             'payment_url' => null,
-            'next_due_date' => null,
+            'next_due_date' => $tenant->isActive() ? $tenant->next_due_date : null,
         ]);
 
         Log::info('Asaas subscription cancelled', ['tenant_id' => $tenant->id, 'subscription_id' => $subscriptionId]);

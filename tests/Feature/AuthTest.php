@@ -18,6 +18,7 @@ class AuthTest extends TestCase
             'phone' => '92991234567',
             'password' => 'password123',
             'password_confirmation' => 'password123',
+            'terms' => true,
         ], $overrides);
     }
 
@@ -48,6 +49,21 @@ class AuthTest extends TestCase
         $user = User::where('email', 'owner@example.com')->first();
         $this->assertNotNull($user->tenant);
         $this->assertSame('João Dono', $user->name);
+    }
+
+    public function test_register_requires_terms_acceptance_and_records_it(): void
+    {
+        $this->postJson('/api/auth/register', $this->registerPayload(['terms' => false]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('terms');
+        $this->assertDatabaseMissing('users', ['email' => 'owner@example.com']);
+
+        $this->postJson('/api/auth/register', $this->registerPayload())->assertStatus(201);
+
+        // Prova do aceite: quando e qual versão dos Termos/Política.
+        $user = User::where('email', 'owner@example.com')->first();
+        $this->assertNotNull($user->terms_accepted_at);
+        $this->assertSame(config('app.terms_version'), $user->terms_version);
     }
 
     public function test_register_creates_owner_barber_profile(): void

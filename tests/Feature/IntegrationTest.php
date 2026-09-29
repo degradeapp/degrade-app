@@ -47,6 +47,7 @@ class IntegrationTest extends TestCase
             'phone' => '92991234567',
             'password' => 'password123',
             'password_confirmation' => 'password123',
+            'terms' => true,
         ]);
 
         $response->assertStatus(201);

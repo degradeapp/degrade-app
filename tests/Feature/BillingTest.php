@@ -207,9 +207,11 @@ class BillingTest extends TestCase
         $this->assertEquals(10, $barbearia->staffLimit());
         $this->assertEquals('Barbearia', $barbearia->label());
 
-        // O bot de WhatsApp 24h faz parte de TODOS os planos (a copy precisa dizer isso).
+        // Enquanto a integração de WhatsApp está parada, NENHUM plano pode prometê-la
+        // (propaganda enganosa). Todo plano tem o link de agendamento online.
         foreach (BillingPlan::cases() as $plan) {
-            $this->assertStringContainsString('bot de WhatsApp 24h', $plan->description());
+            $this->assertStringNotContainsStringIgnoringCase('whatsapp', $plan->description());
+            $this->assertStringContainsString('link de agendamento', $plan->description());
         }
     }
 
@@ -307,6 +309,38 @@ class BillingTest extends TestCase
             ->assertJsonPath('data.status', 'cancelled');
 
         $this->assertEquals('cancelled', Tenant::find($this->tenant->id)->status);
+    }
+
+    public function test_cancelled_subscription_keeps_access_until_the_paid_period_ends(): void
+    {
+        // Pagou até dia X e cancelou antes: os Termos (§4) prometem acesso até o fim do
+        // período pago. Cortar no ato tiraria dias pagos (atrito com o CDC).
+        $this->tenant->update([
+            'status' => 'active', 'plan' => 'solo', 'onboarding_completed_at' => now(),
+            'asaas_subscription_id' => 'sub_123', 'next_due_date' => now()->addDays(20),
+        ]);
+
+        $this->actingAs($this->owner)->postJson('/api/billing/cancel')->assertOk();
+
+        $tenant = $this->tenant->fresh();
+        $this->assertSame('cancelled', $tenant->status);
+        $this->assertTrue($tenant->hasAccess());
+        $this->getJson('/api/customers')->assertOk();
+
+        // Passado o período pago, o acesso fecha.
+        $this->travel(21)->days();
+        $this->assertFalse($tenant->fresh()->hasAccess());
+        $this->getJson('/api/customers')->assertStatus(402);
+    }
+
+    public function test_cancelling_during_trial_does_not_extend_access(): void
+    {
+        $this->tenant->update(['asaas_subscription_id' => 'sub_123', 'next_due_date' => now()->addDays(14)]);
+
+        $this->actingAs($this->owner)->postJson('/api/billing/cancel')->assertOk();
+
+        $this->assertNull($this->tenant->fresh()->next_due_date);
+        $this->assertFalse($this->tenant->fresh()->hasAccess());
     }
 
     public function test_cancel_without_subscription_fails(): void

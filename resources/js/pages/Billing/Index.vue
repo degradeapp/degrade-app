@@ -17,7 +17,7 @@
               Trial até {{ formatDate(info.trial_ends_at) }}
             </p>
             <p v-if="info.next_due_date" class="text-[12px] text-[#A1A1A1] mt-1">
-              Próxima cobrança: {{ formatDate(info.next_due_date) }}
+              {{ info.status === 'cancelled' ? 'Acesso até' : 'Próxima cobrança:' }} {{ formatDate(info.next_due_date) }}
             </p>
           </div>
           <div
@@ -177,8 +177,8 @@ const canCancel = computed(
 
 const info = ref<BillingInfo>({ status: 'trial', plan: null })
 
-// Os dois planos têm TUDO (bot de WhatsApp 24h incluso); o único diferencial
-// é o número de profissionais.
+// Os dois planos têm TUDO; o único diferencial é o número de profissionais.
+// WhatsApp fora da copy enquanto a integração está parada (não prometer o que não existe).
 const plans = [
   {
     id: 'solo',
@@ -190,7 +190,7 @@ const plans = [
     features: [
       '1 profissional',
       'Agenda e link de agendamento online',
-      'Bot de WhatsApp 24h (cliente agenda sozinho)',
+      'Cliente agenda sozinho, 24h, sem baixar app',
       'Comissões e relatórios de faturamento',
       'Clientes com histórico de visitas',
     ],
@@ -207,7 +207,7 @@ const plans = [
       'Agenda e comissão por barbeiro',
       'Acesso da equipe por função (gerente, recepção)',
       'Ranking de barbeiros nos relatórios',
-      'Suporte prioritário no WhatsApp',
+      'Suporte prioritário',
     ],
   },
 ]
@@ -236,7 +236,10 @@ const statusBadge = computed(() => {
 
 const formatDate = (iso: string) => {
   if (!iso) return ''
-  const d = new Date(iso)
+  // Data pura (YYYY-MM-DD, ex.: vencimento): new Date() leria como meia-noite UTC e,
+  // em Manaus (UTC-4), mostraria o dia ANTERIOR. Monta no fuso local.
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.exec(iso)
+  const d = dateOnly ? new Date(`${iso}T12:00:00`) : new Date(iso)
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 

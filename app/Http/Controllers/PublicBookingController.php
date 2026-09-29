@@ -225,6 +225,8 @@ class PublicBookingController extends Controller
             'data' => [
                 'id' => $appointment->id,
                 'starts_at' => $appointment->starts_at?->toIso8601String(),
+                // Fim do horário: o "Salvar na minha agenda" precisa do intervalo.
+                'ends_at' => $appointment->ends_at?->toIso8601String(),
                 'barber_name' => $barber->name,
                 'services' => $services->pluck('name')->values(),
                 'total_price' => (float) $appointment->total_price,
@@ -240,7 +242,7 @@ class PublicBookingController extends Controller
     {
         $tenant = Tenant::where('slug', $slug)->first();
 
-        abort_if(! $tenant || ! ($tenant->isActive() || $tenant->isTrialing()), 404);
+        abort_if(! $tenant || ! $tenant->hasAccess(), 404);
 
         app(TenantContext::class)->set($tenant);
         app()->instance('tenant', $tenant);

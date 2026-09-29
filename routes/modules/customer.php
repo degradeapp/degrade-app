@@ -12,5 +12,11 @@ Route::prefix('api')->name('api.')->group(function () {
         Route::get('/{customer}', [CustomerController::class, 'show'])->name('customers.show');
         Route::put('/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        // LGPD: eliminação dos dados pessoais a pedido do titular. Só o dono; vale
+        // também pra cliente já excluído.
+        Route::post('/{customer}/erase', [CustomerController::class, 'erase'])
+            ->middleware('role:owner')
+            ->withTrashed()
+            ->name('customers.erase');
     });
 });

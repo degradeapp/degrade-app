@@ -62,7 +62,7 @@ import { computed } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import AppLayout from '../../layouts/AppLayout.vue'
 import {
-  Building2, Clock, KeyRound, User, MessageCircle, CreditCard, Bell, History, BarChart3, ChevronRight, Tag, Wallet, Scissors,
+  Building2, Clock, KeyRound, User, CreditCard, Bell, History, BarChart3, ChevronRight, Tag, Wallet, Scissors,
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -110,7 +110,6 @@ const items: Item[] = [
   { section: 'ajustes', href: '/settings/hours', icon: Clock, title: 'Horários', description: 'Horários padrão de funcionamento', roles: ['owner', 'manager'] },
   { section: 'ajustes', href: '/settings/business', icon: Building2, title: 'Barbearia', description: 'Nome, fuso horário, política de cancelamento', roles: ['owner', 'manager'] },
   { section: 'ajustes', href: '/settings/notifications', icon: Bell, title: 'Notificações', description: 'Canais, lembretes e confirmações', roles: ['owner', 'manager'] },
-  { section: 'ajustes', href: '/whatsapp/setup', icon: MessageCircle, title: 'WhatsApp', description: 'Cloud API, webhook e tokens', roles: ['owner'] },
   { section: 'conta', href: '/settings/profile', icon: User, title: 'Meu perfil', description: 'Nome, email e senha' },
   { section: 'conta', href: '/billing', icon: CreditCard, title: 'Plano e cobrança', description: 'Plano atual, próximas cobranças, cartão', roles: ['owner'] },
   { section: 'conta', href: '/audit', icon: History, title: 'Histórico', description: 'Auditoria de alterações no sistema', roles: ['owner', 'manager'] },

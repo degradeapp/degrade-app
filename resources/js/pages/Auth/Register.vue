@@ -14,6 +14,7 @@ const form = reactive({
   phone: '',
   password: '',
   passwordConfirmation: '',
+  terms: false,
 })
 
 const errors = reactive({
@@ -22,6 +23,7 @@ const errors = reactive({
   phone: '',
   password: '',
   passwordConfirmation: '',
+  terms: '',
 })
 
 const formatPhone = (value: string) => {
@@ -53,6 +55,7 @@ const validate = (): boolean => {
   if (form.password !== form.passwordConfirmation) {
     errors.passwordConfirmation = 'As senhas não coincidem'; ok = false
   }
+  if (!form.terms) { errors.terms = 'Aceite os Termos e a Política de Privacidade'; ok = false }
   return ok
 }
 
@@ -67,12 +70,14 @@ const submit = () => {
     phone: form.phone,
     password: form.password,
     password_confirmation: form.passwordConfirmation,
+    terms: form.terms,
   }, {
     onError: (pageErrors: any) => {
       if (pageErrors.name) errors.name = pageErrors.name
       if (pageErrors.email) errors.email = pageErrors.email
       if (pageErrors.phone) errors.phone = pageErrors.phone
       if (pageErrors.password) errors.password = pageErrors.password
+      if (pageErrors.terms) errors.terms = pageErrors.terms
       if (!Object.values(errors).some(e => e)) {
         errorMessage.value = 'Erro ao criar conta. Tente novamente.'
       }
@@ -253,6 +258,25 @@ const submit = () => {
           </div>
         </div>
 
+        <!-- Aceite dos Termos (obrigatório; o servidor grava data e versão) -->
+        <div>
+          <label class="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              v-model="form.terms"
+              type="checkbox"
+              :disabled="isLoading"
+              class="mt-0.5 w-[18px] h-[18px] flex-shrink-0 rounded-[4px] accent-[#FFD60A] cursor-pointer"
+            />
+            <span class="text-[12px] text-[#A1A1A1] leading-relaxed">
+              Li e aceito os
+              <a href="/terms" target="_blank" rel="noopener" class="text-white underline underline-offset-2">Termos de Serviço</a>
+              e a
+              <a href="/privacy" target="_blank" rel="noopener" class="text-white underline underline-offset-2">Política de Privacidade</a>
+            </span>
+          </label>
+          <p v-if="errors.terms" class="text-[12px] text-[#EF4444] mt-1.5">{{ errors.terms }}</p>
+        </div>
+
         <!-- Error geral -->
         <div v-if="errorMessage" class="flex items-start gap-2 text-[12px] text-[#EF4444]">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="flex-shrink-0 mt-0.5">
@@ -277,13 +301,6 @@ const submit = () => {
           {{ isLoading ? 'Criando conta...' : 'Criar conta grátis' }}
         </button>
 
-        <!-- Termos -->
-        <p class="text-[11px] text-[#6B6B6B] text-center leading-relaxed mt-1">
-          Ao se cadastrar, você concorda com os
-          <a href="/terms" target="_blank" rel="noopener" class="text-[#A1A1A1] hover:text-white underline underline-offset-2 transition-colors">Termos de Serviço</a>
-          e
-          <a href="/privacy" target="_blank" rel="noopener" class="text-[#A1A1A1] hover:text-white underline underline-offset-2 transition-colors">Política de Privacidade</a>.
-        </p>
       </form>
 
       <!-- Footer -->

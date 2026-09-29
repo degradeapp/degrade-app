@@ -35,6 +35,7 @@ class Customer extends Model
         'total_visits' => 'int',
         'total_spent' => 'decimal:2',
         'last_visit_at' => 'datetime',
+        'anonymized_at' => 'datetime',
         'is_active' => 'boolean',
     ];
 

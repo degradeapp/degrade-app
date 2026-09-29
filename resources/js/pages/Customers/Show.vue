@@ -120,6 +120,16 @@
         <Button variant="danger" class="w-full" :loading="isDeleting" loading-text="Excluindo..." @click="onDeleteClick">
           Excluir cliente
         </Button>
+        <!-- LGPD: pedido do titular. Só o dono; apaga nome/telefone de verdade. -->
+        <button
+          v-if="isOwner"
+          type="button"
+          :disabled="isErasing"
+          @click="onEraseClick"
+          class="w-full mt-3 text-[13px] text-[#6B6B6B] hover:text-[#EF4444] transition-colors disabled:opacity-60"
+        >
+          {{ isErasing ? 'Apagando dados...' : 'Apagar dados pessoais (pedido do cliente, LGPD)' }}
+        </button>
       </div>
     </div>
   </AppLayout>
@@ -181,10 +191,40 @@ const statusColor = (s: string) =>
     no_show: '#F59E0B',
   }[s] ?? '#6B6B6B')
 
+const isOwner = computed(() => (page.props as any).auth?.user?.role === 'owner')
+const isErasing = ref(false)
+
+const onEraseClick = async () => {
+  const ok = await ask(
+    'Apagar dados pessoais?',
+    'Nome, telefone, e-mail e observações deste cliente serão apagados de vez. Os atendimentos e valores continuam nos relatórios, sem identificação. Não dá para desfazer.',
+    { confirmText: 'Apagar dados', destructive: true }
+  )
+  if (!ok) return
+
+  isErasing.value = true
+  try {
+    const res = await fetch(`/api/customers/${customer.value.id}/erase`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-XSRF-TOKEN': xsrf(),
+      },
+    })
+    if (res.ok || res.status === 204) {
+      router.visit('/customers')
+    }
+  } finally {
+    isErasing.value = false
+  }
+}
+
 const onDeleteClick = async () => {
   const ok = await ask(
     'Excluir cliente?',
-    'Esta ação não pode ser desfeita. Todos os dados deste cliente serão perdidos.',
+    'O cliente sai da sua lista. O histórico de atendimentos continua nos relatórios.',
     { confirmText: 'Excluir', destructive: true }
   )
   if (!ok) return

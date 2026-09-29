@@ -18,7 +18,7 @@ const voltar = () => {
     </header>
 
     <main class="legal max-w-2xl mx-auto px-5 py-6 pb-24">
-      <p class="updated">Última atualização: 9 de junho de 2026</p>
+      <p class="updated">Última atualização: 29 de setembro de 2026</p>
 
       <p>
         Estes Termos de Serviço ("Termos") regem o uso da plataforma Degradê ("Degradê", "plataforma",
@@ -51,8 +51,8 @@ const voltar = () => {
 
       <h2>4. Cancelamento, exclusão e direito de arrependimento</h2>
       <p>
-        Você pode cancelar a assinatura a qualquer momento. O cancelamento encerra a renovação e o
-        acesso às funções pagas conforme o ciclo vigente. Você também pode excluir sua conta quando
+        Você pode cancelar a assinatura a qualquer momento, sem multa. O cancelamento encerra a
+        renovação e você mantém o acesso até o fim do período já pago. Você também pode excluir sua conta quando
         quiser. Após a exclusão, a conta fica recuperável por 30 dias (basta fazer login novamente
         dentro do prazo) e, passado esse período, os dados são apagados em definitivo.
       </p>
@@ -78,8 +78,15 @@ const voltar = () => {
         Ao cadastrar dados de clientes da sua barbearia (como nome, telefone e histórico de
         atendimentos), <strong>você é o responsável (controlador)</strong> por esses dados e declara ter
         base legal para tratá-los, nos termos da Lei Geral de Proteção de Dados (LGPD). O Degradê atua
-        como operador, tratando esses dados apenas para prestar o serviço a você. Veja a
-        <a href="/privacy" target="_blank" rel="noopener">Política de Privacidade</a>.
+        como operador, tratando esses dados apenas para prestar o serviço a você, conforme as suas
+        instruções e os compromissos do item 8 da
+        <a href="/privacy" target="_blank" rel="noopener">Política de Privacidade</a>, que integram estes
+        Termos como acordo de tratamento de dados.
+      </p>
+      <p>
+        Cabe a você atender os pedidos dos seus clientes sobre os dados deles (acesso, correção,
+        eliminação). A plataforma oferece as ferramentas: exportação da base e a opção de apagar os
+        dados pessoais de um cliente na ficha dele.
       </p>
 
       <h2>7. Disponibilidade</h2>
@@ -117,7 +124,7 @@ const voltar = () => {
       <h2>12. Contato</h2>
       <p>
         Dúvidas sobre estes Termos podem ser enviadas para [E-MAIL DE CONTATO]. Operado por
-        [RAZÃO SOCIAL], CNPJ [CNPJ].
+        [NOME OU RAZÃO SOCIAL], [CPF OU CNPJ].
       </p>
     </main>
   </div>

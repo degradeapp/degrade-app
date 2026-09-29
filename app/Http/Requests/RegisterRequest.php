@@ -29,6 +29,14 @@ class RegisterRequest extends FormRequest
             'email' => 'required|email|max:150|unique:users,email',
             'phone' => ['required', 'string', new BrazilianPhone],
             'password' => 'required|string|min:8|max:72|confirmed',
+            'terms' => 'accepted',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'terms.accepted' => 'Para criar a conta, aceite os Termos de Serviço e a Política de Privacidade.',
         ];
     }
 }

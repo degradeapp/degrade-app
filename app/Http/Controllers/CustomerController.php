@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateCustomerRequest;
 use App\Http\Resources\CustomerResource;
 use App\Modules\Customer\Actions\CreateCustomer;
 use App\Modules\Customer\Actions\DeleteCustomer;
+use App\Modules\Customer\Actions\EraseCustomerData;
 use App\Modules\Customer\Actions\UpdateCustomer;
 use App\Modules\Customer\Models\Customer;
 use App\Services\ActivityLogger;
@@ -133,6 +134,20 @@ class CustomerController extends Controller
     }
 
     public function destroy(Customer $customer, DeleteCustomer $action): Response
+    {
+        $this->authorize('delete', $customer);
+
+        $action($customer, auth()->id());
+
+        return response()->noContent();
+    }
+
+    /**
+     * Pedido de eliminação do titular (LGPD): apaga os dados pessoais de verdade e
+     * mantém o histórico financeiro sem identificação. Só o dono; irreversível.
+     * Aceita cliente já excluído (soft-delete) — o pedido pode vir depois.
+     */
+    public function erase(Customer $customer, EraseCustomerData $action): Response
     {
         $this->authorize('delete', $customer);
 

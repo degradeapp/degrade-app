@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CustomerTest extends TestCase
@@ -429,6 +430,58 @@ class CustomerTest extends TestCase
         $this->assertStringNotContainsString(';=HYPERLINK', $csv);
         $this->assertStringNotContainsString("\n=HYPERLINK", $csv);
         $this->assertStringNotContainsString("\n\"=HYPERLINK", $csv);
+    }
+
+    public function test_owner_erases_customer_personal_data_keeping_financial_history(): void
+    {
+        $this->actingAs($this->owner);
+
+        // Criado e editado pela API: a auditoria grava nome/telefone/obs nos logs.
+        $id = $this->postJson('/api/customers', ['name' => 'Fulano Titular', 'phone' => '92991112222', 'notes' => 'alergia a X'])
+            ->assertCreated()->json('id');
+        $this->putJson("/api/customers/{$id}", ['name' => 'Fulano Titular Silva'])->assertOk();
+
+        $appointmentId = DB::table('appointments')->insertGetId([
+            'tenant_id' => $this->tenant->id, 'customer_id' => $id, 'status' => 'completed', 'source' => 'walk_in',
+            'starts_at' => now()->subDay(), 'ends_at' => now()->subDay()->addMinutes(30), 'total_price' => 50,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $conversationId = DB::table('whatsapp_conversations')->insertGetId([
+            'tenant_id' => $this->tenant->id, 'customer_id' => $id, 'phone_number' => '92991112222',
+            'state' => 'idle', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->postJson("/api/customers/{$id}/erase")->assertNoContent();
+
+        $row = DB::table('customers')->where('id', $id)->first();
+        $this->assertSame('Cliente removido', $row->name);
+        $this->assertNull($row->phone);
+        $this->assertNull($row->notes);
+        $this->assertNotNull($row->anonymized_at);
+
+        // Nenhum rastro do dado pessoal na auditoria...
+        $logs = DB::table('activity_log')->get()->toJson();
+        $this->assertStringNotContainsString('Fulano', $logs);
+        $this->assertStringNotContainsString('92991112222', $logs);
+        $this->assertStringNotContainsString('alergia', $logs);
+        // ...mas o ATO de apagar fica registrado.
+        $this->assertDatabaseHas('activity_log', ['action' => 'erased', 'model_id' => $id, 'user_id' => $this->owner->id]);
+
+        // Histórico financeiro preservado; conversa do bot apagada.
+        $this->assertDatabaseHas('appointments', ['id' => $appointmentId, 'customer_id' => $id]);
+        $this->assertDatabaseMissing('whatsapp_conversations', ['id' => $conversationId]);
+    }
+
+    public function test_only_owner_can_erase_and_it_works_on_already_deleted_customer(): void
+    {
+        $customer = Customer::create(['tenant_id' => $this->tenant->id, 'name' => 'Ex Cliente', 'phone' => '92993334444']);
+
+        $this->actingAs($this->manager)->postJson("/api/customers/{$customer->id}/erase")->assertStatus(403);
+
+        $customer->delete(); // excluído antes; o pedido do titular chega depois
+        $this->actingAs($this->owner)->postJson("/api/customers/{$customer->id}/erase")->assertNoContent();
+
+        $this->assertNull(Customer::withTrashed()->find($customer->id)->phone);
     }
 
     public function test_non_owner_cannot_export_customers_csv(): void

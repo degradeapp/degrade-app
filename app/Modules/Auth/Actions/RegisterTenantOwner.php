@@ -49,6 +49,12 @@ readonly class RegisterTenantOwner
                 'is_active' => true,
             ]);
 
+            // Prova do aceite dos Termos/Política (o request exige 'terms' => accepted).
+            $user->forceFill([
+                'terms_accepted_at' => now(),
+                'terms_version' => config('app.terms_version'),
+            ])->save();
+
             // O dono já entra como barbeiro da própria equipe: ele atende clientes e
             // precisa de um perfil pra aparecer na agenda. Nome e telefone vêm do próprio
             // registro — por isso o onboarding NÃO pede isso de novo. Comissão do dono é

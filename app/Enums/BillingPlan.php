@@ -19,8 +19,9 @@ enum BillingPlan: string
      * Limite ÚNICO de funcionários do plano (toda pessoa conta: dono, barbeiros,
      * gerente, recepção). Um número só evita brechas (ex.: cadastrar barbeiro
      * como recepcionista) e segue o padrão de mercado (cobrança por profissional).
-     * É o ÚNICO diferencial entre os planos: todas as funcionalidades (bot de
-     * WhatsApp 24h incluso) estão nos dois.
+     * É o ÚNICO diferencial entre os planos: todas as funcionalidades estão nos dois.
+     * (Bot/lembretes de WhatsApp saíram da copy enquanto a integração está parada:
+     * prometer o que não existe é propaganda enganosa. Volta quando a integração voltar.)
      */
     public function staffLimit(): int
     {
@@ -41,8 +42,8 @@ enum BillingPlan: string
     public function description(): string
     {
         return match ($this) {
-            self::solo => '1 profissional · tudo incluso: agenda, bot de WhatsApp 24h, link de agendamento, comissões e relatórios',
-            self::barbearia => 'Até 10 profissionais · tudo incluso: agenda, bot de WhatsApp 24h, link de agendamento, comissões e relatórios',
+            self::solo => '1 profissional · tudo incluso: agenda, link de agendamento online, comissões e relatórios',
+            self::barbearia => 'Até 10 profissionais · tudo incluso: agenda, link de agendamento online, comissões e relatórios',
         };
     }
 }

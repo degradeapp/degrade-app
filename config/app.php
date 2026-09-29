@@ -68,6 +68,12 @@ return [
     'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*
+    | Versão vigente dos Termos de Serviço e da Política de Privacidade. Gravada no
+    | usuário no aceite do cadastro. Mudou o texto de forma relevante? Suba a data.
+    */
+    'terms_version' => '2026-09-29',
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

@@ -12,9 +12,15 @@ class BillingPolicy extends BasePolicy
         return $user->tenant_id === $tenant->id;
     }
 
-    public function selectPlan(User $user): bool
+    /**
+     * Assinar/trocar de plano vale em QUALQUER status (trial, trial vencido, ativo,
+     * vencido, cancelado). A versão antiga exigia isTrialing() e só funcionava porque
+     * o atalho do dono no BasePolicy::before pula esta checagem: sem ele, ninguém
+     * conseguiria assinar depois que o trial acabasse.
+     */
+    public function selectPlan(User $user, Tenant $tenant): bool
     {
-        return $user->role->value === 'owner' && $user->tenant->isTrialing();
+        return $user->role->value === 'owner' && $user->tenant_id === $tenant->id;
     }
 
     public function cancelPlan(User $user, Tenant $tenant): bool

@@ -12,7 +12,7 @@ class EnsureActiveSubscription
         if ($request->user()) {
             $tenant = $request->user()->tenant;
 
-            if ($tenant && ! $tenant->isActive() && ! $tenant->isTrialing()) {
+            if ($tenant && ! $tenant->hasAccess()) {
                 // API (JSON): 402 Payment Required em pt-BR, com flag pro front
                 // saber rotear pra cobrança. Página (web): redireciona pro /billing.
                 if ($request->expectsJson()) {

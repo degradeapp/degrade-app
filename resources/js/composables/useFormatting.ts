@@ -1,3 +1,13 @@
+/**
+ * String → Date sem o bug de fuso: data pura ("2026-05-22") no new Date() vira
+ * meia-noite UTC, que em Manaus (UTC-4) é o dia ANTERIOR. Data pura é montada ao
+ * meio-dia local; data-hora (ISO com hora/offset) segue o parse normal.
+ */
+const toDate = (date: Date | string): Date => {
+  if (typeof date !== 'string') return date
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T12:00:00`) : new Date(date)
+}
+
 export const useFormatting = () => {
   // BRL: 1250.50 → "R$ 1.250,50"
   const formatBRL = (value: number | null | undefined): string => {
@@ -36,7 +46,7 @@ export const useFormatting = () => {
   // "2026-05-22" → "22/05/2026"
   const formatDateBR = (date: Date | string | null | undefined): string => {
     if (!date) return ''
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const day = String(d.getDate()).padStart(2, '0')
@@ -49,7 +59,7 @@ export const useFormatting = () => {
   // "2026-05-22" → "22/05/26"
   const formatDateBRShort = (date: Date | string | null | undefined): string => {
     if (!date) return ''
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const day = String(d.getDate()).padStart(2, '0')
@@ -70,7 +80,7 @@ export const useFormatting = () => {
   const formatDateRelative = (date: Date | string | null | undefined): string => {
     if (!date) return ''
 
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const today = new Date()
@@ -108,7 +118,7 @@ export const useFormatting = () => {
   const formatDateRelativePast = (date: Date | string | null | undefined): string => {
     if (!date) return ''
 
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const now = new Date()
@@ -130,7 +140,7 @@ export const useFormatting = () => {
   const formatDateLongBR = (date: Date | string | null | undefined): string => {
     if (!date) return ''
 
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const days = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
@@ -149,7 +159,7 @@ export const useFormatting = () => {
   // "21/05/26 14:30"
   const formatDateTimeBR = (date: Date | string | null | undefined): string => {
     if (!date) return ''
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const datePart = formatDateBRShort(d)
@@ -161,7 +171,7 @@ export const useFormatting = () => {
   // "Sexta-feira, 23 de maio"
   const formatDateLong = (date: Date | string | null | undefined): string => {
     if (!date) return ''
-    const d = typeof date === 'string' ? new Date(date) : date
+    const d = toDate(date)
     if (isNaN(d.getTime())) return ''
 
     const s = new Intl.DateTimeFormat('pt-BR', {

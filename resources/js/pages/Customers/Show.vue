@@ -24,12 +24,12 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid gap-2" :class="canSeeFinance ? 'grid-cols-3' : 'grid-cols-2'">
             <div class="bg-[#0A0A0A]/60 border border-[#2A2A2A] rounded-[12px] p-3 text-center">
               <p class="text-[10px] uppercase tracking-[0.08em] text-[#6B6B6B]">Visitas</p>
               <p class="text-[18px] font-bold text-white tabular-nums mt-1">{{ customer.total_visits ?? 0 }}</p>
             </div>
-            <div class="bg-[#0A0A0A]/60 border border-[#2A2A2A] rounded-[12px] p-3 text-center">
+            <div v-if="canSeeFinance" class="bg-[#0A0A0A]/60 border border-[#2A2A2A] rounded-[12px] p-3 text-center">
               <p class="text-[10px] uppercase tracking-[0.08em] text-[#6B6B6B]">Gasto</p>
               <p class="text-[18px] font-bold text-[#FFD60A] tabular-nums mt-1">{{ formatBRL(customer.total_spent ?? 0) }}</p>
             </div>
@@ -117,7 +117,7 @@
 
       <!-- Excluir -->
       <div class="p-4 pt-6">
-        <Button variant="danger" class="w-full" :loading="isDeleting" loading-text="Excluindo..." @click="onDeleteClick">
+        <Button v-if="canSeeFinance" variant="danger" class="w-full" :loading="isDeleting" loading-text="Excluindo..." @click="onDeleteClick">
           Excluir cliente
         </Button>
         <!-- LGPD: pedido do titular. Só o dono; apaga nome/telefone de verdade. -->
@@ -191,7 +191,11 @@ const statusColor = (s: string) =>
     no_show: '#F59E0B',
   }[s] ?? '#6B6B6B')
 
-const isOwner = computed(() => (page.props as any).auth?.user?.role === 'owner')
+const role = computed(() => (page.props as any).auth?.user?.role as string | undefined)
+const isOwner = computed(() => role.value === 'owner')
+// Mesmo recorte do backend (User::canSeeFinance): gasto do cliente e excluir cliente
+// só pra dono e gerente.
+const canSeeFinance = computed(() => role.value === 'owner' || role.value === 'manager')
 const isErasing = ref(false)
 
 const onEraseClick = async () => {

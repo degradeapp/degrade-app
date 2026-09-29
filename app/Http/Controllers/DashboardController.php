@@ -18,7 +18,7 @@ class DashboardController extends Controller
         $tenant = $user->tenant;
         // Dados financeiros (receita, ticket, comissões) são só pra dono/gerente.
         // Recepcionista/barbeiro veem a parte operacional (agenda, ocupação), sem dinheiro.
-        $canSeeFinance = $user->isOwner() || $user->isManager();
+        $canSeeFinance = $user->canSeeFinance();
 
         $today = Carbon::now()->startOfDay();
         $tomorrow = $today->copy()->addDay();

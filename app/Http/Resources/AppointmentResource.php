@@ -18,10 +18,11 @@ class AppointmentResource extends JsonResource
                 'name' => $this->customer->name,
                 'phone' => $this->customer->phone,
             ],
+            // Sem o celular do barbeiro: é dado pessoal do colega e nenhuma tela da
+            // agenda usa (toda a equipe recebe este payload).
             'barber' => $this->barber ? [
                 'id' => $this->barber->id,
                 'name' => $this->barber->name,
-                'phone' => $this->barber->phone,
             ] : null,
             // resolve() achata pra array puro — sem o wrapper "data" que uma resource
             // collection aninhada adicionaria e que quebrava o consumo no frontend.

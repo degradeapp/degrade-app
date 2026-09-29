@@ -79,4 +79,15 @@ class User extends Authenticatable
     {
         return $this->role === UserRole::barber;
     }
+
+    /**
+     * Quem vê dinheiro e dados pessoais da equipe: dono e gerente. Recepção e barbeiro
+     * são operacionais (agenda + clientes) — não veem faturamento, quanto cada cliente
+     * gastou, a comissão dos colegas nem o celular pessoal deles. Fonte única da regra
+     * (dashboard, clientes, agenda, busca).
+     */
+    public function canSeeFinance(): bool
+    {
+        return $this->isOwner() || $this->isManager();
+    }
 }

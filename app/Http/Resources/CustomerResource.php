@@ -17,7 +17,8 @@ class CustomerResource extends JsonResource
             'notes' => $this->notes,
             'is_active' => $this->is_active,
             'total_visits' => $this->total_visits,
-            'total_spent' => $this->total_spent,
+            // Quanto o cliente gastou é faturamento: recepção e barbeiro não veem.
+            'total_spent' => $this->when((bool) $request->user()?->canSeeFinance(), $this->total_spent),
             'last_visit_at' => $this->last_visit_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

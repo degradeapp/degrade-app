@@ -16,13 +16,17 @@ class AppointmentServiceResource extends JsonResource
                 'name' => $this->service->name,
                 'duration_minutes' => $this->service->duration_minutes,
             ],
+            // Sem celular do barbeiro (dado pessoal do colega); a comissão de cada um só
+            // pra quem vê finanças — recepção e barbeiro não sabem quanto o colega ganha.
             'barber' => $this->barber ? [
                 'id' => $this->barber->id,
                 'name' => $this->barber->name,
-                'phone' => $this->barber->phone,
             ] : null,
             'price_snapshot' => $this->price_snapshot,
-            'commission_percentage_snapshot' => $this->commission_percentage_snapshot,
+            'commission_percentage_snapshot' => $this->when(
+                (bool) $request->user()?->canSeeFinance(),
+                $this->commission_percentage_snapshot,
+            ),
         ];
     }
 }

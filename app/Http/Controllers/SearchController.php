@@ -26,8 +26,26 @@ class SearchController extends Controller
 
         $results = $this->searchService->search($tenantId, $query, $page);
 
+        // O cache da busca é por barbearia (não por papel), então o recorte por papel é
+        // feito AQUI, depois do cache. Recepção e barbeiro não veem o celular nem a
+        // comissão dos colegas, nem quanto cada cliente gastou.
+        $items = collect($results['results']);
+        if (! $request->user()?->canSeeFinance()) {
+            $items = $items->map(function (array $item) {
+                if ($item['type'] === 'barber') {
+                    $item['phone'] = null;
+                    unset($item['metadata']['commission']);
+                }
+                if ($item['type'] === 'customer') {
+                    unset($item['metadata']['total_spent']);
+                }
+
+                return $item;
+            });
+        }
+
         return response()->json([
-            'data' => SearchResultResource::collection(collect($results['results'])),
+            'data' => SearchResultResource::collection($items),
             'pagination' => [
                 'total' => $results['total'],
                 'page' => $results['page'],

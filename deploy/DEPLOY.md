@@ -86,10 +86,13 @@ cd /var/www/degrade
 cp .env.production.example .env
 nano .env    # preencher linha a linha; o arquivo é comentado, siga os comentários
 php artisan key:generate --force
+# GUARDE a APP_KEY num gerenciador de senhas: ela cifra o CPF/CNPJ e o token do
+# WhatsApp no banco. Perdeu a chave = esses dados viram lixo ilegível.
 
 composer install --no-dev --optimize-autoloader --no-interaction
 npm ci && npm run build
 
+php artisan deploy:check   # recusa .env perigoso (debug ligado, http, sandbox em produção...)
 php artisan migrate --force
 
 php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan event:cache
@@ -115,6 +118,12 @@ sudo certbot --nginx -d SEU_DOMINIO
 ```
 
 Teste: `https://SEU_DOMINIO/up` deve responder 200 (health check do Laravel).
+
+O health check completo é `https://SEU_DOMINIO/api/health`: responde 503 se o banco cair,
+o worker da fila morrer (job parado há 10+ min), o cron parar (sem batimento há 5+ min)
+ou o disco passar de 90%. **É essa URL que vai no UptimeRobot** (alerta por e-mail/WhatsApp),
+porque as três últimas falhas são silenciosas: o site continua abrindo, mas lembrete,
+backup e expiração de trial param de acontecer.
 
 ## 6. Worker da fila e cron
 
@@ -143,6 +152,14 @@ crontab -e
 3. Criar um agendamento pela agenda e concluir ele.
 4. Abrir o link público `https://SEU_DOMINIO/agendar/SEU_SLUG` NUM CELULAR e agendar como cliente.
 5. `php artisan db:backup` na mão e conferir que apareceu arquivo em `storage/app/backups`.
+6. **Ensaio de restauração** (backup que nunca foi restaurado não é backup), num banco descartável:
+   ```bash
+   sudo -u postgres createdb -O degrade degrade_restore_test
+   pg_restore --no-owner -d degrade_restore_test -h 127.0.0.1 -U degrade storage/app/backups/ARQUIVO_MAIS_RECENTE.dump
+   psql -h 127.0.0.1 -U degrade -d degrade_restore_test -c "select count(*) from tenants; select count(*) from appointments;"
+   sudo -u postgres dropdb degrade_restore_test
+   ```
+   Repetir uma vez por mês.
 
 ## 8. Backup
 
@@ -164,7 +181,13 @@ Com o DSN vazio o Sentry fica desligado e não tem efeito nenhum.
 
 Em produção, webhook SEM secret configurado é REJEITADO por segurança:
 
-- **Asaas:** ao configurar o webhook no painel deles (URL `https://SEU_DOMINIO/api/webhooks/asaas`), defina um secret e cole o mesmo valor em `ASAAS_WEBHOOK_SECRET`. Se o secret ficar vazio no `.env`, NENHUM evento de pagamento entra (assinatura ninguém vira ativa).
+- **Asaas:** no painel (Integrações > Webhooks), criar um webhook:
+  - URL: `https://SEU_DOMINIO/api/webhooks/asaas`
+  - Token de autenticação: um valor aleatório de 32+ caracteres (`openssl rand -hex 24`). O Asaas manda esse valor no header `asaas-access-token`; cole o MESMO valor em `ASAAS_WEBHOOK_SECRET`.
+  - Versão da API: v3. Tipo de envio: sequencial.
+  - Eventos: `PAYMENT_CREATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, `PAYMENT_CHARGEBACK_REQUESTED`, `SUBSCRIPTION_DELETED`, `SUBSCRIPTION_INACTIVATED`.
+  - Se o token ficar vazio no `.env`, NENHUM evento entra. Se o endpoint falhar 15 vezes seguidas o Asaas PAUSA a fila (reativar no painel; os eventos ficam guardados 14 dias).
+  - Antes de vender: validar tudo no STAGING com o sandbox (seção 13), com webhook de verdade, e depois fazer UMA assinatura real sua em produção e cancelar.
 - **WhatsApp:** `WHATSAPP_APP_SECRET` (App Secret do app Meta) valida o HMAC de cada POST; `WHATSAPP_VERIFY_TOKEN` responde o GET de verificação. Sem eles, o bot não recebe mensagem em produção.
 
 Depois de qualquer mudança no `.env`: `php artisan config:cache`.
@@ -181,4 +204,25 @@ Depois de qualquer mudança no `.env`: `php artisan config:cache`.
 cd /var/www/degrade && bash deploy/deploy.sh
 ```
 
-O script põe o app em manutenção, puxa o código, instala dependências, builda, migra, refaz os caches e reinicia o worker. Se algo falhar no meio, ele sai do modo manutenção sozinho ao final do processo.
+O script põe o app em manutenção, puxa o código, instala dependências, roda o `deploy:check`, builda, **faz backup do banco**, migra, refaz os caches, reinicia o worker e só então sai da manutenção. Se algo falhar, o site **fica em manutenção de propósito** (código novo com banco velho é pior que fora do ar) e o script imprime os comandos pra voltar pro commit anterior.
+
+Regra: todo deploy passa PRIMEIRO pelo staging (seção 13).
+
+## 13. Staging (ambiente de teste, separado da produção)
+
+Uma cópia do app em `https://teste.SEU_DOMINIO`, com banco, usuário e `.env` PRÓPRIOS. Serve pra testar migração, integração e tela no celular antes de expor o cliente real. Pode morar no mesmo VPS (mais barato) ou num VPS pequeno separado (mais seguro).
+
+1. DNS: registro A `teste` apontando pro VPS.
+2. Banco separado: `CREATE USER degrade_staging ...; CREATE DATABASE degrade_staging OWNER degrade_staging;` (nunca o usuário/banco da produção).
+3. Código em `/var/www/degrade-staging` (mesmo passo da seção 4), `.env` com:
+   - `APP_ENV=staging`, `APP_DEBUG=false`, `APP_URL=https://teste.SEU_DOMINIO`
+   - `DB_DATABASE=degrade_staging`, `DB_USERNAME=degrade_staging`
+   - `ASAAS_SANDBOX=true` e a chave de **sandbox** (`$aact_hmlg_...`); o `deploy:check` RECUSA staging com chave de produção
+   - `WHATSAPP_*` vazios (staging não manda mensagem pra cliente real)
+   - `MAIL_MAILER=log`
+   - `APP_KEY` própria (`php artisan key:generate`), diferente da produção
+4. Nginx: copiar o bloco do site com `server_name teste.SEU_DOMINIO`, `root /var/www/degrade-staging/public`, e acrescentar senha (`auth_basic`, `htpasswd`) + `add_header X-Robots-Tag "noindex, nofollow" always;` (Google não indexa, estranho não entra). O caminho `/api/webhooks/asaas` fica SEM auth_basic (o Asaas não manda senha; ele se autentica pelo token).
+5. Supervisor e cron próprios (worker e `schedule:run` apontando pra `/var/www/degrade-staging`).
+6. Webhook do Asaas SANDBOX apontando pra `https://teste.SEU_DOMINIO/api/webhooks/asaas`.
+7. Deploy: `APP_DIR=/var/www/degrade-staging bash deploy/deploy.sh`. Validou no celular? Aí roda na produção.
+8. Dados: só `php artisan demo:seed` e contas de teste. NUNCA copiar o banco da produção pro staging (dado pessoal de cliente real, LGPD).

@@ -13,6 +13,9 @@ server {
 
     charset utf-8;
 
+    # Não anuncia a versão do nginx nas respostas/páginas de erro.
+    server_tokens off;
+
     # Fotos de perfil sobem por upload (limite da app é menor; folga aqui)
     client_max_body_size 10m;
 

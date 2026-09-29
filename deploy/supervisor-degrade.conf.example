@@ -4,7 +4,9 @@
 
 [program:degrade-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/degrade/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+; --timeout=90: job travado (API externa pendurada) é morto e re-tentado; --backoff
+; espaça as tentativas (a API do WhatsApp/Asaas costuma voltar em segundos).
+command=php /var/www/degrade/artisan queue:work database --sleep=3 --tries=3 --backoff=10,60 --timeout=90 --max-time=3600
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -13,4 +15,7 @@ user=deploy
 numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/www/degrade/storage/logs/worker.log
+; sem teto o log do worker cresce até encher o disco
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
 stopwaitsecs=3600

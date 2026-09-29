@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
 import {
-  CalendarCheck, Link2, Wallet, Users, BarChart3, Smartphone, ShieldCheck, Check, ChevronDown,
+  CalendarCheck, Link2, Wallet, Users, BarChart3, ShieldCheck, Check, ChevronDown,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useFormatting } from '@/composables/useFormatting'
@@ -19,37 +19,38 @@ const props = defineProps<{ plans: Plan[]; trialDays: number }>()
 const { formatBRL } = useFormatting()
 
 const steps = [
-  { n: '1', title: 'Cadastre em 10 minutos', text: 'Serviços, preços, horários e a sua equipe. Sem instalar nada.' },
-  { n: '2', title: 'Compartilhe o seu link', text: 'Na bio do Instagram, no WhatsApp e num QR code no balcão.' },
-  { n: '3', title: 'O cliente agenda sozinho', text: 'A qualquer hora, sem baixar app. Você só atende.' },
+  { n: '1', title: 'Cadastre serviços, preços e equipe', text: 'Pelo celular, em uns 10 minutos. Os horários de cada barbeiro já vêm preenchidos e você ajusta.' },
+  { n: '2', title: 'Coloque o link na bio e no WhatsApp', text: 'Cada barbearia recebe um endereço próprio, como degradeapp.com.br/agendar/sua-barbearia.' },
+  { n: '3', title: 'Os horários caem na agenda', text: 'O cliente só vê horário livre do barbeiro que escolheu, então dois clientes nunca pegam o mesmo horário.' },
 ]
 
 const features = [
-  { icon: Link2, title: 'Link de agendamento', text: 'O cliente escolhe serviço, barbeiro e horário livre. Nada de conflito de horário.' },
-  { icon: CalendarCheck, title: 'Agenda por barbeiro', text: 'Encaixe no balcão, remarcação e status de cada atendimento num toque.' },
-  { icon: Wallet, title: 'Comissão automática', text: 'Concluiu o atendimento, a comissão de cada barbeiro já está calculada.' },
-  { icon: Users, title: 'Clientes com histórico', text: 'Quantas vezes veio, quanto gastou e quando foi a última visita.' },
-  { icon: BarChart3, title: 'Relatórios de faturamento', text: 'Quanto entrou no dia, na semana e no mês, e quem mais faturou.' },
-  { icon: Smartphone, title: 'Feito para o celular', text: 'Instala na tela inicial como um app. Funciona no balcão e na cadeira.' },
+  { icon: Link2, title: 'Link de agendamento', text: 'O cliente escolhe serviço, barbeiro, dia e horário pelo navegador do celular. Não precisa baixar aplicativo.' },
+  { icon: CalendarCheck, title: 'Agenda por barbeiro', text: 'Encaixe de quem chega no balcão, remarcação, falta e atendimento concluído, cada um no seu horário.' },
+  { icon: Wallet, title: 'Comissão por atendimento', text: 'Você define a porcentagem de cada barbeiro. Ao concluir o atendimento, o valor dele é calculado e guardado.' },
+  { icon: Users, title: 'Ficha do cliente', text: 'Número de visitas, data da última vinda, observações e todos os atendimentos anteriores.' },
+  { icon: BarChart3, title: 'Relatório de faturamento', text: 'Quanto entrou por dia, semana e mês, e o faturamento de cada barbeiro no período.' },
+  { icon: ShieldCheck, title: 'Acesso da equipe', text: 'Gerente, recepção e barbeiro entram com login próprio e veem só o que é da função deles.' },
 ]
 
 const faqs = [
-  { q: 'Meu cliente precisa baixar algum aplicativo?', a: 'Não. Ele abre o seu link no navegador do celular, escolhe o horário e pronto.' },
-  { q: 'Preciso de cartão de crédito para testar?', a: `Não. São ${props.trialDays} dias grátis com tudo liberado, sem cartão.` },
-  { q: 'Tem fidelidade ou multa para cancelar?', a: 'Não. Você cancela quando quiser pela própria plataforma e continua usando até o fim do período já pago.' },
-  { q: 'Qual a diferença entre os planos?', a: 'Só o número de profissionais. Todas as funções estão nos dois planos.' },
-  { q: 'Os dados dos meus clientes ficam seguros?', a: 'Sim. Os dados de cada barbearia ficam isolados, com acesso por função da equipe, conexão segura e cópia de segurança diária. Você pode exportar a sua base quando quiser.' },
+  { q: 'Meu cliente precisa baixar algum aplicativo?', a: 'Não. Ele abre o seu link no navegador do celular, escolhe o horário e recebe a confirmação na tela, com a opção de salvar na agenda do próprio celular.' },
+  { q: 'Preciso cadastrar cartão para testar?', a: `Não. O teste dura ${props.trialDays} dias, com todas as funções, e não pede cartão. Você só informa o pagamento se decidir assinar.` },
+  { q: 'Tem fidelidade ou multa para cancelar?', a: 'Não. O cancelamento é feito na própria plataforma e o acesso continua até o fim do período que você já pagou.' },
+  { q: 'Qual a diferença entre os planos?', a: 'O número de profissionais: o Solo tem 1 e o Barbearia tem até 10. As funções são as mesmas.' },
+  { q: 'Quem da equipe vê o faturamento?', a: 'Só o dono e o gerente. Recepção e barbeiros veem a agenda e os clientes, mas não veem faturamento nem a comissão dos colegas.' },
+  { q: 'Consigo levar meus clientes se sair?', a: 'Sim. O dono exporta a base de clientes em planilha a qualquer momento.' },
 ]
 
 const openFaq = ref<number | null>(0)
 </script>
 
 <template>
-  <Head title="Degradê · Agenda online para barbearias">
+  <Head title="Degradê · Agendamento online e comissão para barbearias">
     <meta
       head-key="description"
       name="description"
-      content="Seu cliente agenda sozinho pelo link do Instagram, sem baixar app. Agenda por barbeiro, comissão automática e relatórios. Teste grátis."
+      content="Sistema para barbearia com link de agendamento online, agenda por barbeiro e cálculo de comissão. Teste grátis por 14 dias."
     />
   </Head>
 
@@ -71,15 +72,14 @@ const openFaq = ref<number | null>(0)
       <!-- HERO -->
       <section class="max-w-5xl mx-auto px-4 pt-14 pb-16 md:pt-24 md:pb-24 text-center">
         <p class="inline-flex items-center gap-2 text-[12px] font-medium text-[#FFD60A] bg-[#FFD60A]/10 border border-[#FFD60A]/20 rounded-full px-3 py-1 mb-6">
-          Agenda online para barbearias
+          Para barbearias
         </p>
         <h1 class="text-[34px] leading-[1.1] md:text-[56px] font-bold tracking-tight max-w-3xl mx-auto">
-          Seu cliente agenda sozinho.<br class="hidden sm:block" />
-          <span class="text-[#FFD60A]">Você só corta.</span>
+          Agendamento online e <span class="text-[#FFD60A]">controle de comissão</span> para barbearias
         </h1>
         <p class="text-[16px] md:text-[18px] text-[#A1A1A1] leading-relaxed max-w-xl mx-auto mt-5">
-          Link de agendamento para a bio do Instagram, agenda por barbeiro e comissão calculada
-          na hora. Sem o cliente baixar app, sem você responder mensagem de madrugada.
+          O cliente escolhe o serviço, o barbeiro e um horário livre pelo link da bio do Instagram.
+          Quando você conclui o atendimento, a comissão de cada barbeiro já está calculada.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
           <Link href="/register" class="w-full sm:w-auto h-12 px-7 flex items-center justify-center rounded-[10px] bg-[#FFD60A] text-[#0A0A0A] text-[16px] font-bold hover:bg-[#FFE066] transition-colors shadow-[0_8px_24px_-8px_rgba(255,214,10,0.5)]">
@@ -89,17 +89,17 @@ const openFaq = ref<number | null>(0)
             Ver preços
           </a>
         </div>
-        <p class="text-[13px] text-[#6B6B6B] mt-4">Sem cartão de crédito. Sem fidelidade.</p>
+        <p class="text-[13px] text-[#6B6B6B] mt-4">{{ trialDays }} dias grátis. O teste não pede cartão.</p>
       </section>
 
       <!-- DOR -->
       <section class="border-y border-[#1F1F1F] bg-[#0F0F0F]">
         <div class="max-w-3xl mx-auto px-4 py-14 text-center">
-          <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight">Horário vazio é dinheiro que não volta</h2>
+          <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight">Se hoje a agenda roda pelo WhatsApp</h2>
           <p class="text-[15px] md:text-[17px] text-[#A1A1A1] leading-relaxed mt-4">
-            Agendar pelo WhatsApp na mão toma o seu tempo, gera conflito de horário e deixa buraco na
-            agenda. E a comissão no fim do mês vira conta de caderno. O Degradê organiza isso tudo
-            num lugar só, direto no celular.
+            Você responde mensagem entre um corte e outro, às vezes dois clientes ficam com o mesmo
+            horário, e no fim do mês a comissão de cada barbeiro é somada no caderno. Com o Degradê o
+            cliente marca pelo link, a agenda de cada barbeiro fica no celular e a comissão sai pronta.
           </p>
         </div>
       </section>
@@ -119,7 +119,7 @@ const openFaq = ref<number | null>(0)
       <!-- FUNÇÕES -->
       <section class="border-t border-[#1F1F1F]">
         <div class="max-w-5xl mx-auto px-4 py-16 md:py-20">
-          <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight text-center">Tudo o que a barbearia precisa</h2>
+          <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight text-center">O que vem no sistema</h2>
           <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-10">
             <div v-for="f in features" :key="f.title" class="flex gap-4 bg-[#131313] border border-[#2A2A2A] rounded-[14px] p-5">
               <div class="w-10 h-10 rounded-[10px] bg-[#FFD60A]/10 flex items-center justify-center flex-shrink-0">
@@ -137,8 +137,8 @@ const openFaq = ref<number | null>(0)
       <!-- PREÇOS -->
       <section id="precos" class="border-t border-[#1F1F1F] bg-[#0F0F0F] scroll-mt-14">
         <div class="max-w-4xl mx-auto px-4 py-16 md:py-20">
-          <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight text-center">Preço justo, sem surpresa</h2>
-          <p class="text-[15px] text-[#A1A1A1] text-center mt-3">Todas as funções nos dois planos. A diferença é só o tamanho da equipe.</p>
+          <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight text-center">Planos</h2>
+          <p class="text-[15px] text-[#A1A1A1] text-center mt-3">Os dois planos têm as mesmas funções. O que muda é quantos profissionais você cadastra.</p>
           <div class="grid md:grid-cols-2 gap-4 mt-10">
             <div
               v-for="p in plans"
@@ -172,13 +172,13 @@ const openFaq = ref<number | null>(0)
                 class="mt-auto h-12 flex items-center justify-center rounded-[10px] text-[15px] font-bold transition-colors"
                 :class="p.staff_limit > 1 ? 'bg-[#FFD60A] text-[#0A0A0A] hover:bg-[#FFE066]' : 'border border-[#2A2A2A] text-white hover:border-[#FFD60A]'"
               >
-                Começar {{ trialDays }} dias grátis
+                Testar {{ trialDays }} dias grátis
               </Link>
             </div>
           </div>
           <p class="flex items-center justify-center gap-2 text-[13px] text-[#6B6B6B] mt-6">
             <ShieldCheck :size="16" :stroke-width="2" />
-            Cancele quando quiser, sem multa.
+            Sem fidelidade. Ao cancelar, você usa até o fim do período pago.
           </p>
         </div>
       </section>
@@ -207,10 +207,10 @@ const openFaq = ref<number | null>(0)
       <!-- CTA FINAL -->
       <section class="border-t border-[#1F1F1F] bg-[#0F0F0F]">
         <div class="max-w-3xl mx-auto px-4 py-16 text-center">
-          <h2 class="text-[26px] md:text-[34px] font-bold tracking-tight">Sua agenda organizada ainda hoje</h2>
-          <p class="text-[15px] text-[#A1A1A1] mt-3">Crie a conta, cadastre seus serviços e compartilhe o link. Leva menos de 10 minutos.</p>
+          <h2 class="text-[26px] md:text-[34px] font-bold tracking-tight">Teste com a sua agenda de verdade</h2>
+          <p class="text-[15px] text-[#A1A1A1] mt-3">Crie a conta, cadastre os serviços e mande o link para os seus clientes. São {{ trialDays }} dias para ver se funciona na sua barbearia.</p>
           <Link href="/register" class="inline-flex mt-8 h-12 px-8 items-center justify-center rounded-[10px] bg-[#FFD60A] text-[#0A0A0A] text-[16px] font-bold hover:bg-[#FFE066] transition-colors">
-            Testar grátis por {{ trialDays }} dias
+            Criar conta grátis
           </Link>
         </div>
       </section>

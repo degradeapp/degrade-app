@@ -25,7 +25,10 @@ class StoreAppointmentRequest extends FormRequest
             'service_ids' => 'required|array|min:1',
             'service_ids.*' => [Rule::exists('services', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'barber_ids' => 'nullable|array',
-            'barber_ids.*' => ['nullable', Rule::exists('barbers', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            // Só barbeiro ATIVO: o teto do plano conta só os ativos, então aceitar um
+            // desativado deixava o Solo manter vários barbeiros "desligados" e seguir
+            // agendando neles (agenda e comissão por barbeiro pelo preço do Solo).
+            'barber_ids.*' => ['nullable', Rule::exists('barbers', 'id')->where('tenant_id', $tenantId)->where('is_active', true)->whereNull('deleted_at')],
             // Override de preço por serviço só para este atendimento (id => valor).
             'prices' => 'nullable|array',
             'prices.*' => 'nullable|numeric|min:0|max:999999',
@@ -42,6 +45,7 @@ class StoreAppointmentRequest extends FormRequest
     {
         return [
             'starts_at.after_or_equal' => 'O horário não pode ser no passado.',
+            'barber_ids.*.exists' => 'Este barbeiro está desativado. Reative-o em Barbeiros para agendar com ele.',
             'starts_at.date_format' => 'Horário inválido.',
         ];
     }

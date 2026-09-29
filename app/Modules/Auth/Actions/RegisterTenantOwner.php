@@ -26,7 +26,7 @@ readonly class RegisterTenantOwner
                 'name' => 'Minha Barbearia',
                 'slug' => $this->uniqueSlug(),
                 'status' => 'trial',
-                'trial_ends_at' => now()->addDays(14),
+                'trial_ends_at' => now()->addDays((int) config('app.trial_days')),
                 'settings' => [
                     'timezone' => config('app.timezone'),
                     'locale' => config('app.locale'),

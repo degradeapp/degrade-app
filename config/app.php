@@ -73,6 +73,9 @@ return [
     */
     'terms_version' => '2026-09-29',
 
+    // Dias de teste grátis de uma barbearia nova (cadastro, landing e Termos §3).
+    'trial_days' => 14,
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

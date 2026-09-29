@@ -39,6 +39,23 @@ enum BillingPlan: string
         };
     }
 
+    /**
+     * Catálogo público (landing, tela de cobrança): derivado do enum, então preço e
+     * limite nunca divergem da regra de negócio.
+     *
+     * @return array<int, array{plan: string, label: string, price: float, staff_limit: int, description: string}>
+     */
+    public static function catalog(): array
+    {
+        return array_map(fn (self $plan) => [
+            'plan' => $plan->value,
+            'label' => $plan->label(),
+            'price' => $plan->price(),
+            'staff_limit' => $plan->staffLimit(),
+            'description' => $plan->description(),
+        ], self::cases());
+    }
+
     public function description(): string
     {
         return match ($this) {

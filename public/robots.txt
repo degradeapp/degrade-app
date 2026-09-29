@@ -1,2 +1,8 @@
 User-agent: *
-Disallow:
+# Landing, Termos/Privacidade e os links públicos das barbearias (/agendar/...) podem
+# ser indexados: ajudam o cliente a achar a barbearia. API e telas internas, não.
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password

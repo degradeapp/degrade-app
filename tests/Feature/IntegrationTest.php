@@ -138,8 +138,17 @@ class IntegrationTest extends TestCase
 
     public function test_dashboard_page_requires_auth()
     {
-        $response = $this->get('/');
-        $response->assertStatus(302); // Redirect to login
+        // Visitante na raiz vê a LANDING (não o painel, nem redirect pro login)...
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Landing')
+                ->has('plans', 2)
+                ->where('plans.0.price', 59)
+                ->where('trialDays', 14));
+
+        // ...e qualquer outra página protegida continua mandando pro login.
+        $this->get('/appointments')->assertRedirect('/login');
     }
 
     public function test_authenticated_user_can_access_dashboard()

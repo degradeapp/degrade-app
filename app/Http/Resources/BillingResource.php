@@ -24,22 +24,9 @@ class BillingResource extends JsonResource
             'next_due_date' => $this->next_due_date?->toDateString(),
             // Só os 4 últimos: o documento completo nunca volta pro navegador.
             'billing_document_hint' => $this->billing_document ? '••• '.substr($this->billing_document, -4) : null,
-            'available_plans' => $this->getAvailablePlans(),
+            // Deriva do enum (fonte única): preço, limite e copy nunca divergem
+            // entre a tela de cobrança, a landing e a regra de negócio.
+            'available_plans' => BillingPlan::catalog(),
         ];
-    }
-
-    /**
-     * Deriva do enum (fonte única): preço, limite e copy nunca divergem
-     * entre a tela de cobrança e a regra de negócio.
-     */
-    private function getAvailablePlans(): array
-    {
-        return array_map(fn (BillingPlan $plan) => [
-            'plan' => $plan->value,
-            'label' => $plan->label(),
-            'price' => $plan->price(),
-            'staff_limit' => $plan->staffLimit(),
-            'description' => $plan->description(),
-        ], BillingPlan::cases());
     }
 }

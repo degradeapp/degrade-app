@@ -7,6 +7,15 @@
 
     <title inertia>{{ config('app.name', 'Degradê') }}</title>
 
+    {{-- PWA: "Adicionar à tela inicial" abre em tela cheia, com ícone próprio --}}
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0A0A0A">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Degradê">
+
     @if (file_exists(public_path('build/manifest.json')))
         @php
             $manifest = json_decode(file_get_contents(public_path('build/manifest.json')), true);

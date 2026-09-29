@@ -48,6 +48,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json(['message' => 'Sua sessão expirou. Faça login novamente.'], 401);
             }
 
+            // Visitante na raiz do domínio vê a landing (200, URL intacta) em vez de ser
+            // jogado no login; logado, "/" continua sendo o painel. Assim a raiz serve os
+            // dois sem mexer na URL do painel (links, testes, onboarding apontam pra "/").
+            if ($request->is('/') && $request->isMethod('GET')) {
+                return \Inertia\Inertia::render('Landing', [
+                    'plans' => \App\Enums\BillingPlan::catalog(),
+                    'trialDays' => (int) config('app.trial_days'),
+                ])->toResponse($request);
+            }
+
             return null;
         });
     })->create();

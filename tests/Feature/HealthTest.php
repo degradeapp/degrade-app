@@ -1,61 +1,53 @@
 <?php
 
-test('health check endpoint returns 200', function () {
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
+use App\Http\Controllers\HealthController;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
-    expect($response->json('status'))->toBeIn(['healthy', 'degraded']);
+beforeEach(function () {
+    Cache::put(HealthController::SCHEDULER_HEARTBEAT_KEY, now()->getTimestamp());
 });
 
-test('health check includes timestamp', function () {
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
-
-    expect($response->json('timestamp'))->not->toBeNull();
+test('health check is public and healthy when everything is running', function () {
+    $this->getJson('/api/health')
+        ->assertOk()
+        ->assertJsonPath('status', 'healthy')
+        ->assertJsonPath('components', [
+            'database' => 'ok',
+            'queue' => 'ok',
+            'scheduler' => 'ok',
+            'storage' => 'ok',
+        ]);
 });
 
-test('health check includes all components', function () {
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
+test('stopped scheduler (cron dead) returns 503', function () {
+    Cache::forget(HealthController::SCHEDULER_HEARTBEAT_KEY);
 
-    $components = $response->json('components');
-    expect($components)->toHaveKeys(['database', 'redis', 'queue', 'storage']);
+    $this->getJson('/api/health')
+        ->assertStatus(503)
+        ->assertJsonPath('components.scheduler', 'error');
 });
 
-test('health check database component', function () {
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
+test('stuck queue (worker dead) returns 503', function () {
+    DB::table('jobs')->insert([
+        'queue' => 'default',
+        'payload' => '{}',
+        'attempts' => 0,
+        'reserved_at' => null,
+        'available_at' => now()->subMinutes(30)->getTimestamp(),
+        'created_at' => now()->subMinutes(30)->getTimestamp(),
+    ]);
 
-    $database = $response->json('components.database');
-    expect($database['status'])->toBeIn(['ok', 'error']);
-    if ($database['status'] === 'ok') {
-        expect($database['latency_ms'])->toBeGreaterThanOrEqual(0);
-    }
+    $this->getJson('/api/health')
+        ->assertStatus(503)
+        ->assertJsonPath('components.queue', 'error');
 });
 
-test('health check redis component', function () {
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
+test('health output never leaks exception details', function () {
+    Cache::forget(HealthController::SCHEDULER_HEARTBEAT_KEY);
 
-    $redis = $response->json('components.redis');
-    expect($redis['status'])->toBeIn(['ok', 'error']);
-    if ($redis['status'] === 'ok') {
-        expect($redis['latency_ms'])->toBeGreaterThanOrEqual(0);
-    }
-});
+    $body = $this->getJson('/api/health')->getContent();
 
-test('health check queue component', function () {
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
-
-    $queue = $response->json('components.queue');
-    expect($queue['status'])->toBeIn(['ok', 'error']);
-});
-
-test('health check does not require authentication', function () {
-    // Should work without login
-    $response = $this->getJson('/api/health')
-        ->assertStatus(200);
-
-    expect($response->json('status'))->not->toBeNull();
+    expect($body)->not->toContain('message')
+        ->and($body)->not->toContain('SQLSTATE');
 });

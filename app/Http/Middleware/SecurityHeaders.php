@@ -23,7 +23,14 @@ class SecurityHeaders
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
 
-        if (app()->environment('production')) {
+        // HSTS: depois da 1ª visita o navegador só fala HTTPS com o domínio (barra
+        // downgrade/SSL-strip em Wi-Fi público). Só em resposta HTTPS, senão não vale.
+        if ($request->isSecure() && app()->environment(['production', 'staging'])) {
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
+
+        // Staging espelha a produção: um CSP que quebre alguma tela aparece lá primeiro.
+        if (app()->environment(['production', 'staging'])) {
             // O build de produção serve JS/CSS externos do próprio domínio (sem
             // scripts inline — ver app.blade.php). Vue pode injetar estilos inline.
             $response->headers->set('Content-Security-Policy', implode('; ', [

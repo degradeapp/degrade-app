@@ -412,6 +412,25 @@ class CustomerTest extends TestCase
         ]);
     }
 
+    public function test_export_neutralizes_spreadsheet_formulas(): void
+    {
+        // Nome vem do link público/bot: "cliente" malicioso vira fórmula no Excel do dono.
+        Customer::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => '=HYPERLINK("http://evil.test","Clique")',
+            'phone' => '92991110001',
+            'notes' => '+1+1',
+        ]);
+
+        $csv = $this->actingAs($this->owner)->get('/api/customers/export')->streamedContent();
+
+        $this->assertStringContainsString("\"'=HYPERLINK(", $csv);
+        $this->assertStringContainsString("'+1+1", $csv);
+        $this->assertStringNotContainsString(';=HYPERLINK', $csv);
+        $this->assertStringNotContainsString("\n=HYPERLINK", $csv);
+        $this->assertStringNotContainsString("\n\"=HYPERLINK", $csv);
+    }
+
     public function test_non_owner_cannot_export_customers_csv(): void
     {
         // API: 403 direto. Web (clique no link): redireciona pra página /403.

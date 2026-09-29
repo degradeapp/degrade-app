@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\HealthController;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Barber\Models\Barber;
 use App\Modules\Commission\Models\Commission;
@@ -10,6 +11,7 @@ use App\Modules\Service\Models\Service;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\User\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -301,6 +303,7 @@ class SystemSmokeTest extends TestCase
         $this->getJson('/api/reports/summary?from='.now()->subDays(7)->toDateString().'&to='.now()->toDateString())->assertOk();
         $this->getJson('/api/search?q=Cliente')->assertOk();
         $this->getJson('/api/audit')->assertOk();
+        Cache::put(HealthController::SCHEDULER_HEARTBEAT_KEY, now()->getTimestamp());
         $this->getJson('/api/health')->assertOk();
 
         // Billing (Asaas em fake)

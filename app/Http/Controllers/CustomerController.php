@@ -60,18 +60,33 @@ class CustomerController extends Controller
 
             Customer::orderBy('name')->chunk(500, function ($customers) use ($out) {
                 foreach ($customers as $c) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map($this->csvSafe(...), [
                         $c->name,
                         $c->phone,
                         $c->email,
                         $c->notes,
                         $c->created_at?->format('d/m/Y'),
-                    ], ';');
+                    ]), ';');
                 }
             });
 
             fclose($out);
         }, 'clientes.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * CSV/formula injection: nome e observação chegam do link público e do bot, então
+     * um "cliente" chamado =HYPERLINK(...) viraria fórmula ativa quando o dono abrisse
+     * o arquivo no Excel. Célula que começa com = + - @ tab ou CR ganha um apóstrofo
+     * (OWASP: vira texto puro).
+     */
+    private function csvSafe(?string $value): ?string
+    {
+        if ($value !== null && $value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 
     public function store(StoreCustomerRequest $request, CreateCustomer $action): JsonResponse

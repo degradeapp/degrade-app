@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // TenantContext needs to be applied globally for all routes
         $middleware->web(append: [
+            // Guarda o hash da senha na sessão: trocar/resetar a senha derruba as sessões
+            // (e o "lembrar de mim") dos outros aparelhos — ex.: funcionário que saiu.
+            // Versão do Sanctum: a do Illuminate quebra com o guard 'sanctum' (RequestGuard).
+            \Laravel\Sanctum\Http\Middleware\AuthenticateSession::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\EnsureTenantContext::class,

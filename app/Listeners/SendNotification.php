@@ -2,24 +2,42 @@
 
 namespace App\Listeners;
 
+use App\Enums\AppointmentSource;
 use App\Events\AppointmentCancelled;
-use App\Events\AppointmentCompleted;
+use App\Events\AppointmentCreated;
 use App\Events\AppointmentRescheduled;
 use App\Modules\Notification\Models\NotificationSetting;
 use App\Modules\Whatsapp\Services\WhatsappClient;
 use Carbon\Carbon;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Log;
 
-class SendNotification
+/**
+ * Mensagens TRANSACIONAIS ao cliente (base legal: execução do contrato). Nada de
+ * "volte sempre"/pós-atendimento — marketing foi removido (LGPD) e só volta com opt-in.
+ *
+ * Na fila e depois do commit: a chamada à API do WhatsApp (até 10s) não segura mais o
+ * request de marcar/cancelar/remarcar no 3G, e nunca notifica algo que sofreu rollback.
+ */
+class SendNotification implements ShouldQueue
 {
+    public bool $afterCommit = true;
+
     public function __construct(private WhatsappClient $whatsapp) {}
 
-    public function handle(AppointmentCompleted|AppointmentCancelled|AppointmentRescheduled $event): void
+    public function handle(AppointmentCreated|AppointmentCancelled|AppointmentRescheduled $event): void
     {
         $appointment = $event->appointment;
         $tenant = $appointment->tenant;
 
         if (! $tenant) {
+            return;
+        }
+
+        // Pelo bot o cliente já recebeu a confirmação na própria conversa; no balcão
+        // (encaixe) ele está ali na frente. Confirmação só pra quem marcou à distância.
+        if ($event instanceof AppointmentCreated
+            && in_array($appointment->source, [AppointmentSource::whatsapp, AppointmentSource::walk_in], true)) {
             return;
         }
 
@@ -30,7 +48,7 @@ class SendNotification
             // o toggle "Agendamento remarcado" da tela não surtia efeito nenhum, e
             // desligar "confirmado" calava a remarcação junto, sem o dono entender.
             $eventKey = match (true) {
-                $event instanceof AppointmentCompleted => 'appointment_confirmed',
+                $event instanceof AppointmentCreated => 'appointment_confirmed',
                 $event instanceof AppointmentCancelled => 'appointment_cancelled',
                 $event instanceof AppointmentRescheduled => 'appointment_rescheduled',
             };
@@ -49,7 +67,13 @@ class SendNotification
             $account = $tenant->whatsappAccount;
             if ($account && $account->is_active) {
                 $message = $this->buildMessage($event, $customerName, $appointment);
-                $this->whatsapp->sendText($account, $customerPhone, $message);
+                if ($this->whatsapp->sendText($account, $customerPhone, $message) === null) {
+                    Log::warning('Notificação WhatsApp não enviada', [
+                        'tenant_id' => $tenant->id,
+                        'appointment_id' => $appointment->id,
+                        'event' => class_basename($event),
+                    ]);
+                }
             }
         }
 
@@ -68,7 +92,7 @@ class SendNotification
         $time = $appointment->starts_at ? Carbon::parse($appointment->starts_at)->format('d/m \à\s H:i') : '';
 
         return match (true) {
-            $event instanceof AppointmentCompleted => "Obrigado pela visita, {$customerName}! Volte sempre. ✂️",
+            $event instanceof AppointmentCreated => "{$customerName}, seu horário está confirmado para {$time}. Te esperamos! ✂️",
             $event instanceof AppointmentCancelled => "{$customerName}, seu horário de {$time} foi cancelado. Se foi engano, agenda um novo!",
             $event instanceof AppointmentRescheduled => "{$customerName}, seu horário foi remarcado para {$time}. Te esperamos!",
             default => '',

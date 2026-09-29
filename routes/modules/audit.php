@@ -3,7 +3,7 @@
 use App\Http\Controllers\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'role:owner,manager'])->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api', 'role:owner,manager'])->group(function () {
     Route::get('/audit', [ActivityLogController::class, 'indexPage'])->name('audit.page');
 
     Route::prefix('api')->name('api.')->group(function () {

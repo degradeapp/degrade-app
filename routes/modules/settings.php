@@ -5,7 +5,7 @@ use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('api')->name('api.')->group(function () {
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('auth:sanctum', 'throttle:api')->group(function () {
         Route::get('/profile', [SettingsController::class, 'getProfile'])->name('profile.get');
         Route::put('/profile', [SettingsController::class, 'updateProfile'])->name('profile.update');
         Route::put('/profile/password', [SettingsController::class, 'updatePassword'])->name('profile.password.update');

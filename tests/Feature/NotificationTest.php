@@ -5,13 +5,17 @@ namespace Tests\Feature;
 use App\Enums\AppointmentSource;
 use App\Enums\AppointmentStatus;
 use App\Events\AppointmentCancelled;
+use App\Events\AppointmentCompleted;
+use App\Events\AppointmentCreated;
 use App\Events\AppointmentRescheduled;
+use App\Listeners\SendNotification;
 use App\Modules\Appointment\Models\Appointment;
 use App\Modules\Customer\Models\Customer;
 use App\Modules\Notification\Models\NotificationSetting;
 use App\Modules\Tenant\Models\Tenant;
 use App\Modules\Whatsapp\Models\WhatsappAccount;
 use App\Modules\Whatsapp\Services\WhatsappClient;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Tests\TestCase;
 
 /**
@@ -133,5 +137,58 @@ class NotificationTest extends TestCase
         AppointmentRescheduled::dispatch($this->appointment);
 
         $this->assertCount(1, $this->spy->sent);
+    }
+
+    public function test_confirmation_is_sent_when_the_appointment_is_booked_remotely(): void
+    {
+        // O toggle "Agendamento confirmado — Quando o horário é marcado" disparava na
+        // CONCLUSÃO, com um "Volte sempre" (nudge de retorno). Agora é na marcação.
+        $this->settings();
+        $this->appointment->update(['source' => AppointmentSource::customer]);
+
+        AppointmentCreated::dispatch($this->appointment);
+
+        $this->assertCount(1, $this->spy->sent);
+        $this->assertStringContainsString('confirmado', $this->spy->sent[0]);
+    }
+
+    public function test_confirmation_respects_its_toggle(): void
+    {
+        $this->settings(['appointment_confirmed' => false]);
+        $this->appointment->update(['source' => AppointmentSource::customer]);
+
+        AppointmentCreated::dispatch($this->appointment);
+
+        $this->assertSame([], $this->spy->sent);
+    }
+
+    public function test_no_confirmation_for_walk_in_or_bot_bookings(): void
+    {
+        $this->settings();
+
+        foreach ([AppointmentSource::walk_in, AppointmentSource::whatsapp] as $source) {
+            $this->appointment->update(['source' => $source]);
+            AppointmentCreated::dispatch($this->appointment);
+        }
+
+        $this->assertSame([], $this->spy->sent);
+    }
+
+    public function test_completion_sends_no_marketing_message(): void
+    {
+        // LGPD: pós-atendimento ("obrigado, volte sempre") é marketing — removido.
+        $this->settings();
+
+        AppointmentCompleted::dispatch($this->appointment);
+
+        $this->assertSame([], $this->spy->sent);
+    }
+
+    public function test_listener_is_queued_after_commit(): void
+    {
+        $listener = new \ReflectionClass(SendNotification::class);
+
+        $this->assertTrue($listener->implementsInterface(ShouldQueue::class));
+        $this->assertTrue($listener->newInstanceWithoutConstructor()->afterCommit);
     }
 }

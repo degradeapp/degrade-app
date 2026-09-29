@@ -80,11 +80,11 @@ class WhatsappController extends Controller
         $secret = config('services.whatsapp.app_secret');
 
         if (! $secret) {
-            // B2: em PRODUÇÃO fecha a porta (fail closed): sem secret não dá pra
-            // confiar no remetente, então rejeita. Dev/local/teste aceita (não há
-            // o que verificar). Configurar WHATSAPP_APP_SECRET é obrigatório no deploy.
-            if (app()->environment('production')) {
-                Log::critical('WHATSAPP_APP_SECRET ausente em produção: webhook rejeitado.');
+            // B2: fora de local/teste (produção E staging) fecha a porta (fail closed):
+            // sem secret não dá pra confiar no remetente, então rejeita. Configurar
+            // WHATSAPP_APP_SECRET é obrigatório no deploy.
+            if (! app()->environment(['local', 'testing'])) {
+                Log::critical('WHATSAPP_APP_SECRET ausente fora do ambiente local: webhook rejeitado.');
 
                 return false;
             }

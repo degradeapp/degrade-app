@@ -3,7 +3,7 @@
 use App\Http\Controllers\OnboardingController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'role:owner', 'onboarding.incomplete'])->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api', 'role:owner', 'onboarding.incomplete'])->group(function () {
     Route::get('/onboarding', [OnboardingController::class, 'show'])->name('onboarding');
 
     Route::prefix('api/onboarding')->name('api.onboarding.')->group(function () {

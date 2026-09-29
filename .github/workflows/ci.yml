@@ -29,6 +29,11 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      # Supply chain (OWASP A03:2025): falha o build se alguma dependência de
+      # produção tiver vulnerabilidade conhecida.
+      - name: Auditoria de dependências PHP
+        run: composer audit --no-dev
+
       - name: Formatação (Pint)
         run: composer lint:check
 
@@ -45,6 +50,9 @@ jobs:
 
       - name: Dependências JS
         run: npm ci
+
+      - name: Auditoria de dependências JS
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Type-check
         run: npm run type-check

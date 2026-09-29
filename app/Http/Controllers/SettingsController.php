@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SettingsController extends Controller
@@ -309,6 +310,10 @@ class SettingsController extends Controller
         }
 
         $user->password = $request->input('password');
+        // Novo remember_token: o "lembrar de mim" dos outros aparelhos deixa de valer. As
+        // sessões abertas caem pelo AuthenticateSession (hash da senha mudou); a sessão
+        // atual tem o hash regravado no fim deste request e continua logada.
+        $user->setRememberToken(Str::random(60));
         $user->save();
 
         return response()->json(['message' => 'Senha alterada com sucesso.']);

@@ -3,108 +3,56 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Redis;
 
+/**
+ * Health check pro monitor externo (UptimeRobot): 200 se tudo ok, 503 se algo falhou.
+ * É público, então só diz ok/error por componente — nunca mensagem de exceção (que
+ * vazaria host, usuário do banco, caminhos). O detalhe do erro vai pro log/Sentry.
+ *
+ * Cobre as falhas SILENCIOSAS de um VPS: worker da fila morto (jobs envelhecendo),
+ * cron parado (sem batimento do scheduler = sem lembrete, sem backup, sem trial:expire)
+ * e disco enchendo (backup diário + logs).
+ */
 class HealthController extends Controller
 {
+    public const SCHEDULER_HEARTBEAT_KEY = 'health:scheduler-heartbeat';
+
     public function check(): JsonResponse
     {
         $components = [
-            'database' => $this->checkDatabase(),
-            'redis' => $this->checkRedis(),
-            'queue' => $this->checkQueue(),
-            'storage' => $this->checkStorage(),
+            'database' => $this->safely(fn () => DB::select('SELECT 1') !== null),
+            'queue' => $this->safely(fn () => ! DB::table('jobs')
+                ->where('available_at', '<', now()->subMinutes(10)->getTimestamp())
+                ->whereNull('reserved_at')
+                ->exists()),
+            'scheduler' => $this->safely(fn () => (int) Cache::get(self::SCHEDULER_HEARTBEAT_KEY, 0) >= now()->subMinutes(5)->getTimestamp()),
+            'storage' => $this->safely(function () {
+                $total = @disk_total_space(storage_path());
+                $free = @disk_free_space(storage_path());
+
+                return $total && $free !== false && ($free / $total) > 0.10;
+            }),
         ];
 
-        $allHealthy = collect($components)->every(fn ($c) => $c['status'] === 'ok');
-        $status = $allHealthy ? 'healthy' : 'degraded';
+        $healthy = ! in_array('error', $components, true);
 
         return response()->json([
-            'status' => $status,
+            'status' => $healthy ? 'healthy' : 'degraded',
             'timestamp' => now()->toIso8601String(),
             'components' => $components,
-        ]);
+        ], $healthy ? 200 : 503);
     }
 
-    private function checkDatabase(): array
-    {
-        $start = microtime(true);
-        try {
-            DB::select('SELECT 1');
-            $latency = (int) ((microtime(true) - $start) * 1000);
-
-            return [
-                'status' => 'ok',
-                'latency_ms' => $latency,
-            ];
-        } catch (\Throwable $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ];
-        }
-    }
-
-    private function checkRedis(): array
-    {
-        $start = microtime(true);
-        try {
-            Redis::ping();
-            $latency = (int) ((microtime(true) - $start) * 1000);
-
-            return [
-                'status' => 'ok',
-                'latency_ms' => $latency,
-            ];
-        } catch (\Throwable $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ];
-        }
-    }
-
-    private function checkQueue(): array
+    private function safely(callable $check): string
     {
         try {
-            $connection = config('queue.default');
-
-            if ($connection === 'redis') {
-                $pendingCount = (int) Redis::llen('queues:default');
-
-                return [
-                    'status' => 'ok',
-                    'pending_jobs' => $pendingCount,
-                ];
-            }
-
-            return [
-                'status' => 'ok',
-                'connection' => $connection,
-            ];
+            return $check() ? 'ok' : 'error';
         } catch (\Throwable $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ];
-        }
-    }
+            report($e);
 
-    private function checkStorage(): array
-    {
-        try {
-            $diskUsagePercent = 0; // In production, use `disk_free_space()` / `disk_total_space()`
-
-            return [
-                'status' => 'ok',
-                'disk_usage_percent' => $diskUsagePercent,
-            ];
-        } catch (\Throwable $e) {
-            return [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ];
+            return 'error';
         }
     }
 }

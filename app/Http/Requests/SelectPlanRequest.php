@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\BillingPlan;
 use App\Rules\CpfCnpj;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SelectPlanRequest extends FormRequest
 {
@@ -25,7 +27,7 @@ class SelectPlanRequest extends FormRequest
         $hasDocument = (bool) $this->user()?->tenant?->billing_document;
 
         return [
-            'plan' => 'required|string|in:solo,barbearia',
+            'plan' => ['required', 'string', Rule::enum(BillingPlan::class)],
             'document' => [$hasDocument ? 'nullable' : 'required', 'string', new CpfCnpj],
         ];
     }
@@ -34,7 +36,7 @@ class SelectPlanRequest extends FormRequest
     {
         return [
             'plan.required' => 'Selecione um plano.',
-            'plan.in' => 'Plano inválido.',
+            'plan.enum' => 'Plano inválido.',
             'document.required' => 'Informe o CPF ou CNPJ do titular da assinatura.',
         ];
     }

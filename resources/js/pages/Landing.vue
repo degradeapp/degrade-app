@@ -12,6 +12,7 @@ interface Plan {
   price: number
   staff_limit: number
   description: string
+  featured: boolean
 }
 
 const props = defineProps<{ plans: Plan[]; trialDays: number }>()
@@ -37,7 +38,7 @@ const faqs = [
   { q: 'Meu cliente precisa baixar algum aplicativo?', a: 'Não. Ele abre o seu link no navegador do celular, escolhe o horário e recebe a confirmação na tela, com a opção de salvar na agenda do próprio celular.' },
   { q: 'Preciso cadastrar cartão para testar?', a: `Não. O teste dura ${props.trialDays} dias, com todas as funções, e não pede cartão. Você só informa o pagamento se decidir assinar.` },
   { q: 'Tem fidelidade ou multa para cancelar?', a: 'Não. O cancelamento é feito na própria plataforma e o acesso continua até o fim do período que você já pagou.' },
-  { q: 'Qual a diferença entre os planos?', a: 'O número de profissionais: o Solo tem 1 e o Barbearia tem até 10. As funções são as mesmas.' },
+  { q: 'Qual a diferença entre os planos?', a: `O tamanho da equipe: ${props.plans.map((p) => `${p.label} ${p.staff_limit === 1 ? 'para 1 pessoa' : `até ${p.staff_limit}`}`).join(', ')}. Recepção e gerente também contam. As funções são as mesmas em todos.` },
   { q: 'Quem da equipe vê o faturamento?', a: 'Só o dono e o gerente. Recepção e barbeiros veem a agenda e os clientes, mas não veem faturamento nem a comissão dos colegas.' },
   { q: 'Consigo levar meus clientes se sair?', a: 'Sim. O dono exporta a base de clientes em planilha a qualquer momento.' },
 ]
@@ -136,32 +137,32 @@ const openFaq = ref<number | null>(0)
 
       <!-- PREÇOS -->
       <section id="precos" class="border-t border-[#1F1F1F] bg-[#0F0F0F] scroll-mt-14">
-        <div class="max-w-4xl mx-auto px-4 py-16 md:py-20">
+        <div class="max-w-5xl mx-auto px-4 py-16 md:py-20">
           <h2 class="text-[24px] md:text-[32px] font-bold tracking-tight text-center">Planos</h2>
-          <p class="text-[15px] text-[#A1A1A1] text-center mt-3">Os dois planos têm as mesmas funções. O que muda é quantos profissionais você cadastra.</p>
-          <div class="grid md:grid-cols-2 gap-4 mt-10">
+          <p class="text-[15px] text-[#A1A1A1] text-center mt-3">Os dois planos têm as mesmas funções. O que muda é o tamanho da equipe.</p>
+          <div class="grid md:grid-cols-3 gap-4 mt-10">
             <div
               v-for="p in plans"
               :key="p.plan"
               class="relative bg-[#131313] border rounded-[16px] p-6 flex flex-col"
-              :class="p.staff_limit > 1 ? 'border-[#FFD60A]' : 'border-[#2A2A2A]'"
+              :class="p.featured ? 'border-[#FFD60A]' : 'border-[#2A2A2A]'"
             >
               <span
-                v-if="p.staff_limit > 1"
+                v-if="p.featured"
                 class="absolute -top-2.5 left-6 px-2.5 py-0.5 rounded-full bg-[#FFD60A] text-[#0A0A0A] text-[11px] font-bold uppercase tracking-wide"
               >
                 Mais escolhido
               </span>
               <h3 class="text-[20px] font-bold">{{ p.label }}</h3>
               <p class="text-[14px] text-[#A1A1A1] mt-1">
-                {{ p.staff_limit === 1 ? 'Para quem atende sozinho' : `Equipe de até ${p.staff_limit} profissionais` }}
+                {{ p.staff_limit === 1 ? 'Para quem atende sozinho' : `Até ${p.staff_limit} pessoas na equipe, contando você` }}
               </p>
               <p class="mt-5">
                 <span class="text-[36px] font-bold text-[#FFD60A] tabular-nums">{{ formatBRL(p.price) }}</span>
                 <span class="text-[14px] text-[#6B6B6B]">/mês</span>
               </p>
               <ul class="space-y-2 mt-5 mb-7 text-[14px] text-white/90">
-                <li class="flex gap-2"><Check :size="17" :stroke-width="2.5" class="text-[#22C55E] flex-shrink-0 mt-0.5" />{{ p.staff_limit === 1 ? '1 profissional' : `Até ${p.staff_limit} profissionais` }}</li>
+                <li class="flex gap-2"><Check :size="17" :stroke-width="2.5" class="text-[#22C55E] flex-shrink-0 mt-0.5" />{{ p.staff_limit === 1 ? '1 profissional' : `Até ${p.staff_limit} pessoas na equipe` }}</li>
                 <li class="flex gap-2"><Check :size="17" :stroke-width="2.5" class="text-[#22C55E] flex-shrink-0 mt-0.5" />Link de agendamento online</li>
                 <li class="flex gap-2"><Check :size="17" :stroke-width="2.5" class="text-[#22C55E] flex-shrink-0 mt-0.5" />Agenda, clientes e comissões</li>
                 <li class="flex gap-2"><Check :size="17" :stroke-width="2.5" class="text-[#22C55E] flex-shrink-0 mt-0.5" />Relatórios de faturamento</li>
@@ -170,7 +171,7 @@ const openFaq = ref<number | null>(0)
               <Link
                 href="/register"
                 class="mt-auto h-12 flex items-center justify-center rounded-[10px] text-[15px] font-bold transition-colors"
-                :class="p.staff_limit > 1 ? 'bg-[#FFD60A] text-[#0A0A0A] hover:bg-[#FFE066]' : 'border border-[#2A2A2A] text-white hover:border-[#FFD60A]'"
+                :class="p.featured ? 'bg-[#FFD60A] text-[#0A0A0A] hover:bg-[#FFE066]' : 'border border-[#2A2A2A] text-white hover:border-[#FFD60A]'"
               >
                 Testar {{ trialDays }} dias grátis
               </Link>

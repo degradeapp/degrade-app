@@ -85,7 +85,7 @@
             <p class="text-[12px] text-[#A1A1A1] mt-0.5">{{ plan.segment }}</p>
           </div>
           <div class="text-right flex-shrink-0">
-            <span class="text-[22px] font-bold text-[#FFD60A] tabular-nums">R$ {{ plan.price }}</span>
+            <span class="text-[22px] font-bold text-[#FFD60A] tabular-nums">R$ {{ Math.round(plan.price) }}</span>
             <span class="text-[12px] text-[#6B6B6B]">/mês</span>
           </div>
         </div>
@@ -155,6 +155,7 @@ interface BillingInfo {
   staff_limit?: number
   staff_count?: number
   asaas_subscription_id?: string | null
+  available_plans?: { plan: string; label: string; price: number; staff_limit: number; featured: boolean }[]
   payment_url?: string | null
   billing_document_hint?: string | null
 }
@@ -177,40 +178,34 @@ const canCancel = computed(
 
 const info = ref<BillingInfo>({ status: 'trial', plan: null })
 
-// Os dois planos têm TUDO; o único diferencial é o número de profissionais.
-// WhatsApp fora da copy enquanto a integração está parada (não prometer o que não existe).
-const plans = [
-  {
-    id: 'solo',
-    name: 'Solo',
-    price: 59,
-    segment: 'Pra quem atende sozinho',
-    featured: false,
-    inherits: '',
-    features: [
-      '1 profissional',
-      'Agenda e link de agendamento online',
-      'Cliente agenda sozinho, 24h, sem baixar app',
-      'Comissões e relatórios de faturamento',
-      'Clientes com histórico de visitas',
-    ],
-  },
-  {
-    id: 'barbearia',
-    name: 'Barbearia',
-    price: 119,
-    segment: 'Pra equipe de até 10',
-    featured: true,
-    inherits: 'Tudo do Solo, e mais:',
-    features: [
-      'Até 10 profissionais',
-      'Agenda e comissão por barbeiro',
-      'Acesso da equipe por função (gerente, recepção)',
-      'Ranking de barbeiros nos relatórios',
-      'Suporte prioritário',
-    ],
-  },
-]
+// Planos vêm da API (BillingPlan::catalog, a mesma fonte da landing): preço, limite
+// e destaque nunca divergem da regra. Todas as funções em todos os planos; o que
+// muda é o tamanho da equipe. WhatsApp fora da copy enquanto a integração está parada.
+const plans = computed(() =>
+  (info.value.available_plans ?? []).map((p) => ({
+    id: p.plan,
+    name: p.label,
+    price: p.price,
+    featured: p.featured,
+    segment: p.staff_limit === 1 ? 'Para quem atende sozinho' : `Até ${p.staff_limit} pessoas na equipe, contando você`,
+    inherits: p.staff_limit === 1 ? '' : 'Tudo do Solo, e mais:',
+    features: p.staff_limit === 1
+      ? [
+          '1 profissional',
+          'Agenda e link de agendamento online',
+          'Cliente agenda sozinho, sem baixar app',
+          'Comissões e relatórios de faturamento',
+          'Clientes com histórico de visitas',
+        ]
+      : [
+          `Até ${p.staff_limit} pessoas na equipe`,
+          'Agenda e comissão por barbeiro',
+          'Cliente escolhe o barbeiro no link',
+          'Acesso da equipe por função (gerente, recepção)',
+          'Faturamento por barbeiro nos relatórios',
+        ],
+  }))
+)
 
 const statusLabel = computed(() => {
   const labels: Record<string, string> = {

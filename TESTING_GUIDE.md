@@ -4,8 +4,8 @@
 > (SQLite, MAIL=log, Asaas sandbox). Integrações externas (WhatsApp/Email/Asaas live)
 > estão **congeladas** por decisão do dono.
 > **Multiunidade/plano Rede foi REMOVIDO** (03/07): um tenant = uma barbearia = um local.
-> Planos finais: **Solo (R$ 59, 1 profissional)** e **Barbearia (R$ 119, até 10)**;
-> bot de WhatsApp 24h em AMBOS — o único diferencial é o nº de profissionais.
+> Planos (29/09/2026): **Solo (R$ 59, 1)**, **Equipe (R$ 89, até 5)** e **Barbearia (R$ 139, até 15)**;
+> o único diferencial é o tamanho da equipe. Bot de WhatsApp fora da copy enquanto a integração está parada.
 
 ## 🧰 Ferramentas de venda/operação (novas)
 - `php artisan demo:seed` — cria o tenant de demonstração **demo-degrade**

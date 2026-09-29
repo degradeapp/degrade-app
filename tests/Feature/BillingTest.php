@@ -186,26 +186,26 @@ class BillingTest extends TestCase
     /**
      * CONTRATO COMERCIAL dos planos. Se este teste quebrar, alguém mudou
      * pricing de propósito: revise a decisão antes de ajustar os números.
-     * Solo = 1 profissional; Barbearia = até 10; o diferencial entre eles é
-     * SÓ o número de profissionais (nenhuma funcionalidade é exclusiva).
+     * Faixas por tamanho de equipe (29/09/2026, alinhadas às do líder de mercado e
+     * abaixo do preço dele): Solo 1 / Equipe até 5 / Barbearia até 15. O diferencial
+     * é SÓ o tamanho da equipe (nenhuma funcionalidade é exclusiva).
      */
     public function test_billing_plan_commercial_contract(): void
     {
-        // Exatamente dois planos: solo e barbearia. Rede foi extinto.
-        $this->assertEqualsCanonicalizing(
-            ['solo', 'barbearia'],
+        $this->assertSame(
+            ['solo', 'equipe', 'barbearia'],
             array_column(BillingPlan::cases(), 'value'),
         );
 
-        $solo = BillingPlan::solo;
-        $this->assertEquals(59.00, $solo->price());
-        $this->assertEquals(1, $solo->staffLimit());
-        $this->assertEquals('Solo', $solo->label());
+        $this->assertEquals([59.00, 1, 'Solo'], [BillingPlan::solo->price(), BillingPlan::solo->staffLimit(), BillingPlan::solo->label()]);
+        $this->assertEquals([89.00, 5, 'Equipe'], [BillingPlan::equipe->price(), BillingPlan::equipe->staffLimit(), BillingPlan::equipe->label()]);
+        $this->assertEquals([139.00, 15, 'Barbearia'], [BillingPlan::barbearia->price(), BillingPlan::barbearia->staffLimit(), BillingPlan::barbearia->label()]);
 
-        $barbearia = BillingPlan::barbearia;
-        $this->assertEquals(119.00, $barbearia->price());
-        $this->assertEquals(10, $barbearia->staffLimit());
-        $this->assertEquals('Barbearia', $barbearia->label());
+        // O do meio é o destaque ("Mais escolhido"), e só ele.
+        $this->assertSame(['equipe'], array_column(array_filter(BillingPlan::catalog(), fn ($p) => $p['featured']), 'plan'));
+
+        // Salto pequeno do Solo pro Equipe: tira o incentivo de dividir o login do dono.
+        $this->assertLessThanOrEqual(30.00, BillingPlan::equipe->price() - BillingPlan::solo->price());
 
         // Enquanto a integração de WhatsApp está parada, NENHUM plano pode prometê-la
         // (propaganda enganosa). Todo plano tem o link de agendamento online.
@@ -220,8 +220,11 @@ class BillingTest extends TestCase
         $this->tenant->update(['plan' => 'solo']);
         $this->assertEquals(1, $this->tenant->staffLimit());
 
+        $this->tenant->update(['plan' => 'equipe']);
+        $this->assertEquals(5, $this->tenant->staffLimit());
+
         $this->tenant->update(['plan' => 'barbearia']);
-        $this->assertEquals(10, $this->tenant->staffLimit());
+        $this->assertEquals(15, $this->tenant->staffLimit());
     }
 
     /**
@@ -237,7 +240,7 @@ class BillingTest extends TestCase
         $tenant = Tenant::find($this->tenant->id);
 
         $this->assertEquals(BillingPlan::barbearia, $tenant->currentPlan());
-        $this->assertEquals(10, $tenant->staffLimit());
+        $this->assertEquals(15, $tenant->staffLimit());
     }
 
     /**
@@ -403,7 +406,7 @@ class BillingTest extends TestCase
 
         Http::assertSent(fn ($r) => $r->method() === 'PUT'
             && str_ends_with($r->url(), '/subscriptions/'.$primeira)
-            && $r['value'] == 119.0
+            && $r['value'] == 139.0
             && $r['updatePendingPayments'] === true);
         Http::assertNotSent(fn ($r) => $r->method() === 'DELETE');
         $this->assertCount(1, collect(Http::recorded())->filter(

@@ -526,15 +526,16 @@ class BarberTest extends TestCase
     {
         $this->actingAs($this->owner);
 
-        // setUp já tem 3 funcionários (dono, gerente, recepção). Sem plano → limite Barbearia (10).
-        // Preenche até a 10ª (última) vaga: cabem mais 7 barbeiros.
-        foreach (range(1, 7) as $i) {
+        // setUp já tem 3 funcionários (dono, gerente, recepção). Plano Equipe → teto 5.
+        // Preenche até a 5ª (última) vaga: cabem mais 2 barbeiros.
+        $this->tenant->update(['plan' => 'equipe']);
+        foreach (range(1, 2) as $i) {
             $this->postJson('/api/barbers', [
                 'name' => "B{$i}", 'phone' => '9299123456'.$i, 'default_commission_percentage' => 20,
             ])->assertStatus(201);
         }
 
-        // 11º funcionário → bloqueado
+        // 6ª pessoa → bloqueada
         $this->postJson('/api/barbers', [
             'name' => 'Excedente', 'phone' => '92991230002', 'default_commission_percentage' => 20,
         ])->assertStatus(403);
@@ -599,10 +600,10 @@ class BarberTest extends TestCase
     public function test_reactivating_a_barber_respects_the_plan_limit(): void
     {
         $this->actingAs($this->owner);
-        $this->tenant->update(['plan' => 'barbearia']); // teto 10
+        $this->tenant->update(['plan' => 'equipe']); // teto 5
 
-        // 3 usuarios do setUp + 7 barbeiros sem login = 10 pessoas, NO limite.
-        Barber::factory()->count(7)->create([
+        // 3 usuarios do setUp + 2 barbeiros sem login = 5 pessoas, NO limite.
+        Barber::factory()->count(2)->create([
             'tenant_id' => $this->tenant->id,
             'user_id' => null,
             'is_active' => true,
@@ -616,7 +617,7 @@ class BarberTest extends TestCase
             'phone' => '92991110000',
         ]);
 
-        $this->assertSame(10, $this->tenant->fresh()->staffCount());
+        $this->assertSame(5, $this->tenant->fresh()->staffCount());
 
         // Reativar consome vaga e levaria a 11. Sem guarda no update, isso fura o
         // teto do plano: desativa um, cria outro, reativa o primeiro, repete.
@@ -627,6 +628,6 @@ class BarberTest extends TestCase
         ])->assertForbidden();
 
         $this->assertFalse((bool) $inativo->fresh()->is_active);
-        $this->assertSame(10, $this->tenant->fresh()->staffCount());
+        $this->assertSame(5, $this->tenant->fresh()->staffCount());
     }
 }

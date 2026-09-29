@@ -143,8 +143,9 @@ class IntegrationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Landing')
-                ->has('plans', 2)
+                ->has('plans', 3)
                 ->where('plans.0.price', 59)
+                ->where('plans.1.featured', true)
                 ->where('trialDays', 14));
 
         // ...e qualquer outra página protegida continua mandando pro login.
